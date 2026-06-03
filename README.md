@@ -24,8 +24,13 @@ El repositorio queda preparado con estas ramas:
 
 - `main`: version estable y entregable.
 - `develop`: integracion del trabajo antes de pasar a `main`.
-- `feature/estructura-inicial`: rama de ejemplo para nuevas funcionalidades.
-- `docs/propuesta`: rama para cambios de documentacion de la propuesta.
+- `feature/backend-auth`: autenticacion del backend.
+- `feature/backend-suppliers`: modulo de suplidores/proveedores.
+- `feature/backend-purchases-ncf`: modulo de compras y NCF.
+- `feature/frontend-auth-ui`: interfaz de autenticacion.
+- `feature/frontend-dashboard`: dashboard principal.
+- `feature/ai-prophet-model`: modelo predictivo con Prophet.
+- `feature/ai-data-pipeline`: pipeline de datos para IA.
 
 Para subirlo a GitHub:
 
@@ -33,7 +38,11 @@ Para subirlo a GitHub:
 git remote add origin https://github.com/USUARIO/NOMBRE-DEL-REPOSITORIO.git
 git push -u origin main
 git push -u origin develop
-git push -u origin feature/estructura-inicial
-git push -u origin docs/propuesta
+git push -u origin feature/backend-auth
+git push -u origin feature/backend-suppliers
+git push -u origin feature/backend-purchases-ncf
+git push -u origin feature/frontend-auth-ui
+git push -u origin feature/frontend-dashboard
+git push -u origin feature/ai-prophet-model
+git push -u origin feature/ai-data-pipeline
 ```
-
