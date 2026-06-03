@@ -35,7 +35,7 @@ El repositorio queda preparado con estas ramas:
 Para subirlo a GitHub:
 
 ```bash
-git remote add origin https://github.com/USUARIO/NOMBRE-DEL-REPOSITORIO.git
+git remote add origin https://github.com/Willy-Alcantara-29/PREDICEX.git
 git push -u origin main
 git push -u origin develop
 git push -u origin feature/backend-auth
