@@ -1,0 +1,33 @@
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencias
+node_modules/
+vendor/
+.venv/
+venv/
+
+# Builds y salidas
+dist/
+build/
+coverage/
+*.log
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Archivos temporales
+tmp/
+temp/
+work/
+outputs/
