@@ -40,6 +40,25 @@ Repositorio base para el desarrollo del proyecto del Grupo 13. PREDICEX es una P
 - `config/`: configuraciones del proyecto.
 - `scripts/`: scripts de automatización.
 
+## Entregables de avance
+
+- `docs/avance-inicial.md`: capturas requeridas, explicacion del backend, primeras rutas o endpoints, pruebas basicas y observaciones tecnicas.
+- `docs/avance-2-primeros-modulos-funcionales.md`: primeros modulos funcionales, frontend inicial, backend, endpoints y pruebas basicas.
+
+## Ejecucion local
+
+Backend inicial:
+
+```bash
+npm run start:backend
+```
+
+Pruebas basicas del backend:
+
+```bash
+npm run test:backend
+```
+
 ## Flujo de trabajo Git
 
 El repositorio queda preparado con estas ramas:

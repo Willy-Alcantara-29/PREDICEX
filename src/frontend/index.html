@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PREDICEX | Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="loginView" class="login-shell">
+      <section class="login-layout" aria-labelledby="loginTitle">
+        <div class="login-panel">
+          <div class="brand-block">
+            <div class="brand-mark">PX</div>
+            <div>
+              <p class="eyebrow">Supply intelligence platform</p>
+              <h1 id="loginTitle">PREDICEX</h1>
+              <p class="brand-subtitle">Gestion predictiva de inventario y abastecimiento multisucursal.</p>
+            </div>
+          </div>
+
+          <form id="loginForm" class="login-form">
+            <label>
+              Correo corporativo
+              <span class="input-shell">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M4 6h16v12H4z" />
+                  <path d="m4 7 8 6 8-6" />
+                </svg>
+                <input type="email" value="admin@predicex.local" placeholder="usuario@empresa.com" autocomplete="email" required />
+              </span>
+            </label>
+            <label>
+              Contrasena
+              <span class="input-shell">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <rect x="5" y="10" width="14" height="10" rx="2" />
+                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                </svg>
+                <input type="password" value="predicex2026" placeholder="Ingresa tu contrasena" autocomplete="current-password" required />
+              </span>
+            </label>
+            <button type="submit">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <path d="m10 17 5-5-5-5" />
+                <path d="M15 12H3" />
+              </svg>
+              Ingresar al sistema
+            </button>
+          </form>
+
+          <div class="login-summary">
+            <span>JWT simulado</span>
+            <span>Rol: Gerencia</span>
+            <span>Ambiente demo</span>
+          </div>
+        </div>
+
+        <aside class="login-visual" aria-label="Resumen logistico">
+          <div class="visual-topline">
+            <div>
+              <span>Panel predictivo</span>
+              <strong>Operacion en tiempo real</strong>
+            </div>
+            <small>Live</small>
+          </div>
+
+          <div class="preview-kpis" aria-label="Indicadores principales">
+            <article>
+              <span>Inventario Total</span>
+              <strong>18,420</strong>
+            </article>
+            <article>
+              <span>Prediccion IA</span>
+              <strong>92%</strong>
+            </article>
+            <article>
+              <span>Sucursales Activas</span>
+              <strong>8</strong>
+            </article>
+            <article class="alert-card">
+              <span>Alertas Pendientes</span>
+              <strong>12</strong>
+            </article>
+          </div>
+
+          <section class="demand-preview" aria-label="Grafico de tendencia de demanda">
+            <div class="panel-heading compact">
+              <div>
+                <h3>Tendencia de demanda</h3>
+                <span>Proyeccion semanal IA</span>
+              </div>
+              <strong>+18.4%</strong>
+            </div>
+            <div class="trend-chart">
+              <span style="height: 38%"></span>
+              <span style="height: 52%"></span>
+              <span style="height: 47%"></span>
+              <span style="height: 68%"></span>
+              <span style="height: 76%"></span>
+              <span style="height: 88%"></span>
+              <span style="height: 72%"></span>
+            </div>
+          </section>
+
+          <div class="insight-row">
+            <article class="risk">
+              <span>Riesgo de rotura</span>
+              <strong>12 SKU</strong>
+              <p>requieren reabastecimiento antes de 7 dias.</p>
+            </article>
+            <article>
+              <span>Ordenes pendientes</span>
+              <strong>27</strong>
+              <p>compras en proceso de recepcion.</p>
+            </article>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <main id="appView" class="app-shell hidden">
+      <aside class="sidebar">
+        <div class="brand-row">
+          <div class="brand-mark small">PX</div>
+          <div>
+            <strong>PREDICEX</strong>
+            <span>Supply control</span>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Navegacion principal">
+          <button class="nav-item active" data-view="dashboardView">Dashboard</button>
+          <button class="nav-item" data-view="inventoryView">Inventario</button>
+          <button class="nav-item" data-view="suppliersView">Proveedores</button>
+        </nav>
+
+        <button id="logoutButton" class="ghost-button">Cerrar sesion</button>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Centro de distribucion multisucursal</p>
+            <h2 id="viewTitle">Dashboard operativo</h2>
+          </div>
+          <div class="topbar-actions">
+            <div class="status-pill">Stock sincronizado</div>
+            <div class="user-chip">CN</div>
+          </div>
+        </header>
+
+        <section id="dashboardView" class="view active-view">
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>Inventario total</span>
+              <strong>18,420</strong>
+              <p>unidades disponibles</p>
+            </article>
+            <article class="metric-card warning">
+              <span>Alertas activas</span>
+              <strong>12</strong>
+              <p>productos bajo umbral</p>
+            </article>
+            <article class="metric-card">
+              <span>Ordenes abiertas</span>
+              <strong>27</strong>
+              <p>compras en proceso</p>
+            </article>
+            <article class="metric-card success">
+              <span>Precision IA</span>
+              <strong>91%</strong>
+              <p>proyeccion semanal</p>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Demanda proyectada</h3>
+                <span>Proximos 6 meses</span>
+              </div>
+              <div class="bar-chart" aria-label="Grafico de demanda proyectada">
+                <span style="height: 45%"></span>
+                <span style="height: 62%"></span>
+                <span style="height: 58%"></span>
+                <span style="height: 75%"></span>
+                <span style="height: 88%"></span>
+                <span style="height: 70%"></span>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Movimientos recientes</h3>
+                <span>Auditoria de stock</span>
+              </div>
+              <ul class="activity-list">
+                <li><strong>Entrada</strong><span>240 unidades - Almacen central</span></li>
+                <li><strong>Salida</strong><span>86 unidades - Sucursal Norte</span></li>
+                <li><strong>Transferencia</strong><span>35 unidades - Este a Centro</span></li>
+                <li><strong>Alerta</strong><span>SKU-PRD-018 bajo umbral minimo</span></li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="inventoryView" class="view">
+          <article class="panel">
+            <div class="panel-heading">
+              <h3>Modulo inicial de inventario</h3>
+              <button id="addStockButton" class="small-button">Simular entrada</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Producto</th>
+                    <th>Sucursal</th>
+                    <th>Stock</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="inventoryTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section id="suppliersView" class="view">
+          <article class="panel">
+            <div class="panel-heading">
+              <h3>Proveedores homologados</h3>
+              <span>Validacion RNC/NCF pendiente de API</span>
+            </div>
+            <div class="supplier-grid">
+              <article>
+                <strong>Distribuidora Caribe SRL</strong>
+                <span>RNC 131245678</span>
+                <p>Estado: Activo</p>
+              </article>
+              <article>
+                <strong>Suplidores del Norte</strong>
+                <span>RNC 101334455</span>
+                <p>Estado: Activo</p>
+              </article>
+              <article>
+                <strong>Logistica Integral RD</strong>
+                <span>RNC 132009981</span>
+                <p>Estado: Revision</p>
+              </article>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

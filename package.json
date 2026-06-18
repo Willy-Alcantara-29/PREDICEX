@@ -1,0 +1,10 @@
+{
+  "name": "predicex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PREDICEX - Plataforma de Optimizacion de Suministro y Logistica Predictiva",
+  "scripts": {
+    "start:backend": "node src/backend/server.js",
+    "test:backend": "node tests/backend/api.test.js"
+  }
+}
