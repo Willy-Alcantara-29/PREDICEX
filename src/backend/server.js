@@ -5,6 +5,7 @@ const { URL } = require("url");
 
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_FILE = path.resolve(__dirname, "../database/data.json");
+const FRONTEND_DIRECTORY = path.resolve(__dirname, "../frontend");
 
 const seedData = {
   proveedores: [
@@ -100,6 +101,32 @@ function sendJson(response, statusCode, data) {
     "Access-Control-Allow-Headers": "Content-Type",
   });
   response.end(JSON.stringify(data, null, 2));
+}
+
+function sendFile(response, filePath) {
+  const contentTypes = {
+    ".css": "text/css; charset=utf-8",
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+  };
+  const extension = path.extname(filePath);
+
+  response.writeHead(200, {
+    "Content-Type": contentTypes[extension] || "application/octet-stream",
+  });
+  fs.createReadStream(filePath).pipe(response);
+}
+
+function handleStaticFrontend(pathname, response) {
+  const requestedPath = pathname === "/" ? "/index.html" : pathname;
+  const filePath = path.resolve(FRONTEND_DIRECTORY, `.${requestedPath}`);
+
+  if (!filePath.startsWith(FRONTEND_DIRECTORY) || !fs.existsSync(filePath)) {
+    return false;
+  }
+
+  sendFile(response, filePath);
+  return true;
 }
 
 function readBody(request) {
@@ -290,6 +317,10 @@ async function router(request, response) {
 
   if (request.method === "OPTIONS") {
     sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (request.method === "GET" && handleStaticFrontend(pathname, response)) {
     return;
   }
 

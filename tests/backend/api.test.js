@@ -22,6 +22,12 @@ async function request(path, options) {
   return { response, data };
 }
 
+async function requestText(path) {
+  const response = await fetch(`${BASE_URL}${path}`);
+  const data = await response.text();
+  return { response, data };
+}
+
 async function run() {
   server.resetDatabaseForTests();
   await startServer();
@@ -31,6 +37,10 @@ async function run() {
     assert.strictEqual(health.response.status, 200);
     assert.strictEqual(health.data.status, "ok");
     assert.strictEqual(health.data.database, "json-local");
+
+    const page = await requestText("/");
+    assert.strictEqual(page.response.status, 200);
+    assert.ok(page.data.includes("PREDICEX"));
 
     const proveedores = await request("/proveedores");
     assert.strictEqual(proveedores.response.status, 200);
