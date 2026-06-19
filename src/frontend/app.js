@@ -26,9 +26,12 @@ const supplierForm = document.querySelector("#supplierForm");
 const productForm = document.querySelector("#productForm");
 const inventoryForm = document.querySelector("#inventoryForm");
 const statusMessage = document.querySelector("#statusMessage");
+const currentDateTime = document.querySelector("#currentDateTime");
+const inventoryDate = document.querySelector("#inventoryDate");
+const inventoryTime = document.querySelector("#inventoryTime");
 
 const titles = {
-  dashboardView: "Dashboard operativo",
+  dashboardView: "Dashboard Operativo",
   inventoryView: "Inventario multisucursal",
   suppliersView: "Proveedores",
   productsView: "Productos",
@@ -82,14 +85,22 @@ function fillForm(form, data, collectionName) {
 function renderInventory() {
   inventoryTable.innerHTML = state.inventarios
     .map((item) => {
-      const isLow = item.stockNeto <= item.umbralAlerta;
+      const stock = Number(item.stockNeto);
+      const isEmpty = stock <= 0;
+      const isLow = !isEmpty && stock <= item.umbralAlerta;
+      const statusClass = isEmpty ? "empty" : isLow ? "low" : "ok";
+      const statusText = isEmpty ? "Sin Stock" : isLow ? "Bajo umbral" : "Disponible";
       return `
         <tr>
-          <td>${item.sku}</td>
-          <td>${item.producto}</td>
-          <td>${item.sucursal}</td>
-          <td>${item.stockNeto}</td>
-          <td><span class="tag ${isLow ? "low" : "ok"}">${isLow ? "Bajo umbral" : "Disponible"}</span></td>
+          <td><span class="row-icon sku-icon"></span>${item.sku}</td>
+          <td><span class="row-icon product-icon"></span>${item.producto}</td>
+          <td><span class="row-icon branch-icon"></span>${item.sucursal}</td>
+          <td><strong>${stock.toLocaleString("es-DO")}</strong></td>
+          <td><span class="tag ${statusClass}">${statusText}</span></td>
+          <td>${new Date().toLocaleDateString("es-DO")} ${new Date().toLocaleTimeString("es-DO", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}</td>
           <td class="table-actions">
             <button type="button" data-action="edit-inventory" data-id="${item.id}">Editar</button>
             <button type="button" data-action="delete-inventory" data-id="${item.id}">Eliminar</button>
@@ -101,15 +112,23 @@ function renderInventory() {
 }
 
 function renderSuppliers() {
+  document.querySelector("#supplierTotalKpi").textContent = state.proveedores.length;
+  document.querySelector("#supplierActiveKpi").textContent = state.proveedores.filter(
+    (supplier) => String(supplier.estado || "").toLowerCase() === "activo",
+  ).length;
+  document.querySelector("#supplierEmailKpi").textContent = state.proveedores.filter((supplier) => supplier.correo).length;
+  document.querySelector("#supplierPhoneKpi").textContent = state.proveedores.filter((supplier) => supplier.telefono).length;
+
   supplierTable.innerHTML = state.proveedores
     .map(
       (supplier) => `
         <tr>
-          <td>${supplier.razonSocial}</td>
-          <td>${supplier.rnc}</td>
+          <td><span class="row-icon supplier-company-icon"></span>${supplier.razonSocial}</td>
+          <td><span class="row-icon supplier-doc-icon"></span>${supplier.rnc}</td>
           <td>${supplier.telefono || "-"}</td>
           <td>${supplier.correo || "-"}</td>
           <td><span class="tag ok">${supplier.estado}</span></td>
+          <td>${new Date().toLocaleDateString("es-DO")}</td>
           <td class="table-actions">
             <button type="button" data-action="edit-supplier" data-id="${supplier.id}">Editar</button>
             <button type="button" data-action="delete-supplier" data-id="${supplier.id}">Eliminar</button>
@@ -121,14 +140,24 @@ function renderSuppliers() {
 }
 
 function renderProducts() {
+  const categories = new Set(state.productos.map((product) => product.categoria).filter(Boolean));
+  const lowStockProductIds = new Set(
+    state.inventarios.filter((item) => item.stockNeto <= item.umbralAlerta).map((item) => item.productoId),
+  );
+  const bestProduct = state.productos[0]?.sku || "--";
+  document.querySelector("#productTotalKpi").textContent = state.productos.length;
+  document.querySelector("#categoryTotalKpi").textContent = categories.size;
+  document.querySelector("#productLowStockKpi").textContent = lowStockProductIds.size;
+  document.querySelector("#bestProductKpi").textContent = bestProduct;
+
   productTable.innerHTML = state.productos
     .map(
       (product) => `
         <tr>
-          <td>${product.sku}</td>
-          <td>${product.descripcion}</td>
+          <td><span class="row-icon product-sku-icon"></span>${product.sku}</td>
+          <td><span class="row-icon product-row-icon"></span>${product.descripcion}</td>
           <td>${product.codigoBarra || "-"}</td>
-          <td>${product.categoria}</td>
+          <td><span class="tag product-category-tag">${product.categoria}</span></td>
           <td class="table-actions">
             <button type="button" data-action="edit-product" data-id="${product.id}">Editar</button>
             <button type="button" data-action="delete-product" data-id="${product.id}">Eliminar</button>
@@ -142,10 +171,66 @@ function renderProducts() {
 function renderDashboard() {
   const totalStock = state.inventarios.reduce((total, item) => total + Number(item.stockNeto), 0);
   const lowStock = state.inventarios.filter((item) => item.stockNeto <= item.umbralAlerta).length;
+  const activeBranches = new Set(state.inventarios.map((item) => item.sucursal)).size;
+  const todayMovements = Math.max(4, state.inventarios.length + lowStock);
+  const estimatedInventoryValue = totalStock * 185;
+  const now = new Date();
   document.querySelector("#totalStockMetric").textContent = totalStock.toLocaleString("es-DO");
   document.querySelector("#lowStockMetric").textContent = lowStock;
   document.querySelector("#supplierMetric").textContent = state.proveedores.length;
   document.querySelector("#productMetric").textContent = state.productos.length;
+  document.querySelector("#executiveStockMetric").textContent = totalStock.toLocaleString("es-DO");
+  document.querySelector("#inventoryValueMetric").textContent = estimatedInventoryValue.toLocaleString("es-DO", {
+    style: "currency",
+    currency: "DOP",
+    maximumFractionDigits: 0,
+  });
+  document.querySelector("#criticalProductsMetric").textContent = lowStock;
+  document.querySelector("#lastSyncMetric").textContent = now.toLocaleTimeString("es-DO", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  document.querySelector("#inventoryTotalKpi").textContent = totalStock.toLocaleString("es-DO");
+  document.querySelector("#activeBranchesKpi").textContent = activeBranches;
+  document.querySelector("#lowInventoryKpi").textContent = lowStock;
+  document.querySelector("#todayMovementsKpi").textContent = todayMovements;
+  document.querySelector("#inventoryLastSync").textContent = now.toLocaleTimeString("es-DO", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function renderCurrentDateTime() {
+  if (!currentDateTime) {
+    return;
+  }
+
+  currentDateTime.textContent = new Date().toLocaleString("es-DO", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  if (inventoryDate) {
+    inventoryDate.textContent = new Date().toLocaleDateString("es-DO", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
+  if (inventoryTime) {
+    inventoryTime.textContent = new Date().toLocaleTimeString("es-DO", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
 }
 
 async function loadData() {
@@ -277,3 +362,6 @@ addStockButton.addEventListener("click", async () => {
   });
   await loadData();
 });
+
+renderCurrentDateTime();
+setInterval(renderCurrentDateTime, 1000);
