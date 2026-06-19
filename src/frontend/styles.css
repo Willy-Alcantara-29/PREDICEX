@@ -522,6 +522,28 @@ input:focus {
   font-weight: 800;
 }
 
+.status-note {
+  margin: -10px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: #fff;
+  font-weight: 700;
+}
+
+.status-note.ok {
+  border-color: #b7e2ce;
+  color: var(--green);
+  background: #eefaf4;
+}
+
+.status-note.error {
+  border-color: #f1b4aa;
+  color: var(--red);
+  background: #fff1f0;
+}
+
 .user-chip {
   width: 42px;
   height: 42px;
@@ -598,6 +620,35 @@ input:focus {
   margin-bottom: 18px;
 }
 
+.crud-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfe;
+}
+
+.crud-form label {
+  gap: 6px;
+  font-size: 0.86rem;
+}
+
+.crud-form input {
+  min-height: 42px;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.crud-form .small-button {
+  min-height: 42px;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
 .bar-chart {
   height: 260px;
   display: grid;
@@ -658,6 +709,25 @@ th {
   text-transform: uppercase;
 }
 
+.table-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.table-actions button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--ink);
+  background: #fff;
+  font-weight: 800;
+}
+
+.table-actions button:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
 .tag {
   display: inline-block;
   border-radius: 999px;
@@ -716,7 +786,8 @@ th {
   }
 
   .metric-grid,
-  .supplier-grid {
+  .supplier-grid,
+  .crud-form {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 }
@@ -747,7 +818,8 @@ th {
   }
 
   .metric-grid,
-  .supplier-grid {
+  .supplier-grid,
+  .crud-form {
     grid-template-columns: 1fr;
   }
 

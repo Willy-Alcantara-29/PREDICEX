@@ -44,6 +44,7 @@ Repositorio base para el desarrollo del proyecto del Grupo 13. PREDICEX es una P
 
 - `docs/avance-inicial.md`: capturas requeridas, explicacion del backend, primeras rutas o endpoints, pruebas basicas y observaciones tecnicas.
 - `docs/avance-2-primeros-modulos-funcionales.md`: primeros modulos funcionales, frontend inicial, backend, endpoints y pruebas basicas.
+- `docs/avance-3-integracion-datos-nuevos-modulos.md`: CRUD completo, formularios, listados, integracion con base local simulada y problemas resueltos.
 
 ## Ejecucion local
 
@@ -52,6 +53,8 @@ Backend inicial:
 ```bash
 npm run start:backend
 ```
+
+La API utiliza `src/database/data.json` como base local simulada para persistir los cambios realizados desde los endpoints y desde el frontend.
 
 Pruebas basicas del backend:
 

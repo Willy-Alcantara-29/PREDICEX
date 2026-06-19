@@ -1,0 +1,56 @@
+{
+  "proveedores": [
+    {
+      "id": "prov-001",
+      "razonSocial": "Distribuidora Caribe SRL",
+      "rnc": "131245678",
+      "telefono": "809-555-0142",
+      "correo": "compras@caribe.example",
+      "estado": "Activo"
+    },
+    {
+      "id": "prov-002",
+      "razonSocial": "Suplidores del Norte",
+      "rnc": "101334455",
+      "telefono": "809-555-0188",
+      "correo": "ventas@norte.example",
+      "estado": "Activo"
+    }
+  ],
+  "productos": [
+    {
+      "id": "prd-001",
+      "sku": "SKU-PRD-018",
+      "codigoBarra": "746000000018",
+      "descripcion": "Arroz premium 25 lb",
+      "categoria": "Alimentos"
+    },
+    {
+      "id": "prd-002",
+      "sku": "SKU-PRD-104",
+      "codigoBarra": "746000000104",
+      "descripcion": "Aceite vegetal 1 gal",
+      "categoria": "Alimentos"
+    }
+  ],
+  "inventarios": [
+    {
+      "id": "inv-001",
+      "productoId": "prd-001",
+      "sku": "SKU-PRD-018",
+      "producto": "Arroz premium 25 lb",
+      "sucursal": "Sucursal Norte",
+      "stockNeto": 8,
+      "umbralAlerta": 20
+    },
+    {
+      "id": "inv-002",
+      "productoId": "prd-002",
+      "sku": "SKU-PRD-104",
+      "producto": "Aceite vegetal 1 gal",
+      "sucursal": "Almacen Central",
+      "stockNeto": 240,
+      "umbralAlerta": 60
+    }
+  ]
+}

@@ -134,6 +134,7 @@
           <button class="nav-item active" data-view="dashboardView">Dashboard</button>
           <button class="nav-item" data-view="inventoryView">Inventario</button>
           <button class="nav-item" data-view="suppliersView">Proveedores</button>
+          <button class="nav-item" data-view="productsView">Productos</button>
         </nav>
 
         <button id="logoutButton" class="ghost-button">Cerrar sesion</button>
@@ -151,27 +152,29 @@
           </div>
         </header>
 
+        <p id="statusMessage" class="status-note">Esperando sincronizacion con backend.</p>
+
         <section id="dashboardView" class="view active-view">
           <div class="metric-grid">
             <article class="metric-card">
               <span>Inventario total</span>
-              <strong>18,420</strong>
+              <strong id="totalStockMetric">0</strong>
               <p>unidades disponibles</p>
             </article>
             <article class="metric-card warning">
               <span>Alertas activas</span>
-              <strong>12</strong>
+              <strong id="lowStockMetric">0</strong>
               <p>productos bajo umbral</p>
             </article>
             <article class="metric-card">
-              <span>Ordenes abiertas</span>
-              <strong>27</strong>
-              <p>compras en proceso</p>
+              <span>Proveedores</span>
+              <strong id="supplierMetric">0</strong>
+              <p>homologados registrados</p>
             </article>
             <article class="metric-card success">
-              <span>Precision IA</span>
-              <strong>91%</strong>
-              <p>proyeccion semanal</p>
+              <span>Productos</span>
+              <strong id="productMetric">0</strong>
+              <p>catalogo activo</p>
             </article>
           </div>
 
@@ -209,9 +212,34 @@
         <section id="inventoryView" class="view">
           <article class="panel">
             <div class="panel-heading">
-              <h3>Modulo inicial de inventario</h3>
+              <h3>Inventario CRUD</h3>
               <button id="addStockButton" class="small-button">Simular entrada</button>
             </div>
+
+            <form id="inventoryForm" class="crud-form">
+              <label>
+                SKU
+                <input name="sku" placeholder="SKU-PRD-018" required />
+              </label>
+              <label>
+                Producto
+                <input name="producto" placeholder="Arroz premium 25 lb" required />
+              </label>
+              <label>
+                Sucursal
+                <input name="sucursal" placeholder="Sucursal Norte" required />
+              </label>
+              <label>
+                Stock
+                <input name="stockNeto" type="number" min="0" placeholder="20" required />
+              </label>
+              <label>
+                Umbral
+                <input name="umbralAlerta" type="number" min="0" placeholder="10" required />
+              </label>
+              <button type="submit" class="small-button" data-default-text="Guardar inventario">Guardar inventario</button>
+            </form>
+
             <div class="table-wrap">
               <table>
                 <thead>
@@ -221,6 +249,7 @@
                     <th>Sucursal</th>
                     <th>Stock</th>
                     <th>Estado</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="inventoryTable"></tbody>
@@ -232,25 +261,92 @@
         <section id="suppliersView" class="view">
           <article class="panel">
             <div class="panel-heading">
-              <h3>Proveedores homologados</h3>
-              <span>Validacion RNC/NCF pendiente de API</span>
+              <h3>Proveedores CRUD</h3>
+              <span>Crear, leer, actualizar y eliminar</span>
             </div>
-            <div class="supplier-grid">
-              <article>
-                <strong>Distribuidora Caribe SRL</strong>
-                <span>RNC 131245678</span>
-                <p>Estado: Activo</p>
-              </article>
-              <article>
-                <strong>Suplidores del Norte</strong>
-                <span>RNC 101334455</span>
-                <p>Estado: Activo</p>
-              </article>
-              <article>
-                <strong>Logistica Integral RD</strong>
-                <span>RNC 132009981</span>
-                <p>Estado: Revision</p>
-              </article>
+
+            <form id="supplierForm" class="crud-form">
+              <label>
+                Razon social
+                <input name="razonSocial" placeholder="Proveedor Demo SRL" required />
+              </label>
+              <label>
+                RNC
+                <input name="rnc" placeholder="132555777" required />
+              </label>
+              <label>
+                Telefono
+                <input name="telefono" placeholder="809-555-0199" />
+              </label>
+              <label>
+                Correo
+                <input name="correo" type="email" placeholder="ventas@demo.example" />
+              </label>
+              <label>
+                Estado
+                <input name="estado" placeholder="Activo" />
+              </label>
+              <button type="submit" class="small-button" data-default-text="Guardar proveedor">Guardar proveedor</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Razon social</th>
+                    <th>RNC</th>
+                    <th>Telefono</th>
+                    <th>Correo</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="supplierTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section id="productsView" class="view">
+          <article class="panel">
+            <div class="panel-heading">
+              <h3>Productos CRUD</h3>
+              <span>Catalogo conectado al backend</span>
+            </div>
+
+            <form id="productForm" class="crud-form">
+              <label>
+                SKU
+                <input name="sku" placeholder="SKU-PRD-231" required />
+              </label>
+              <label>
+                Descripcion
+                <input name="descripcion" placeholder="Cafe molido 1 lb" required />
+              </label>
+              <label>
+                Codigo barra
+                <input name="codigoBarra" placeholder="746000000231" />
+              </label>
+              <label>
+                Categoria
+                <input name="categoria" placeholder="Alimentos" />
+              </label>
+              <button type="submit" class="small-button" data-default-text="Guardar producto">Guardar producto</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Descripcion</th>
+                    <th>Codigo barra</th>
+                    <th>Categoria</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="productTable"></tbody>
+              </table>
             </div>
           </article>
         </section>

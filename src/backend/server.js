@@ -1,70 +1,102 @@
+const fs = require("fs");
 const http = require("http");
+const path = require("path");
 const { URL } = require("url");
 
 const PORT = Number(process.env.PORT || 3000);
+const DATABASE_FILE = path.resolve(__dirname, "../database/data.json");
 
-const proveedores = [
-  {
-    id: "prov-001",
-    razonSocial: "Distribuidora Caribe SRL",
-    rnc: "131245678",
-    telefono: "809-555-0142",
-    correo: "compras@caribe.example",
-    estado: "Activo",
-  },
-  {
-    id: "prov-002",
-    razonSocial: "Suplidores del Norte",
-    rnc: "101334455",
-    telefono: "809-555-0188",
-    correo: "ventas@norte.example",
-    estado: "Activo",
-  },
-];
+const seedData = {
+  proveedores: [
+    {
+      id: "prov-001",
+      razonSocial: "Distribuidora Caribe SRL",
+      rnc: "131245678",
+      telefono: "809-555-0142",
+      correo: "compras@caribe.example",
+      estado: "Activo",
+    },
+    {
+      id: "prov-002",
+      razonSocial: "Suplidores del Norte",
+      rnc: "101334455",
+      telefono: "809-555-0188",
+      correo: "ventas@norte.example",
+      estado: "Activo",
+    },
+  ],
+  productos: [
+    {
+      id: "prd-001",
+      sku: "SKU-PRD-018",
+      codigoBarra: "746000000018",
+      descripcion: "Arroz premium 25 lb",
+      categoria: "Alimentos",
+    },
+    {
+      id: "prd-002",
+      sku: "SKU-PRD-104",
+      codigoBarra: "746000000104",
+      descripcion: "Aceite vegetal 1 gal",
+      categoria: "Alimentos",
+    },
+  ],
+  inventarios: [
+    {
+      id: "inv-001",
+      productoId: "prd-001",
+      sku: "SKU-PRD-018",
+      producto: "Arroz premium 25 lb",
+      sucursal: "Sucursal Norte",
+      stockNeto: 8,
+      umbralAlerta: 20,
+    },
+    {
+      id: "inv-002",
+      productoId: "prd-002",
+      sku: "SKU-PRD-104",
+      producto: "Aceite vegetal 1 gal",
+      sucursal: "Almacen Central",
+      stockNeto: 240,
+      umbralAlerta: 60,
+    },
+  ],
+};
 
-const productos = [
-  {
-    id: "prd-001",
-    sku: "SKU-PRD-018",
-    codigoBarra: "746000000018",
-    descripcion: "Arroz premium 25 lb",
-    categoria: "Alimentos",
-  },
-  {
-    id: "prd-002",
-    sku: "SKU-PRD-104",
-    codigoBarra: "746000000104",
-    descripcion: "Aceite vegetal 1 gal",
-    categoria: "Alimentos",
-  },
-];
+function clone(data) {
+  return JSON.parse(JSON.stringify(data));
+}
 
-const inventarios = [
-  {
-    id: "inv-001",
-    productoId: "prd-001",
-    sku: "SKU-PRD-018",
-    producto: "Arroz premium 25 lb",
-    sucursal: "Sucursal Norte",
-    stockNeto: 8,
-    umbralAlerta: 20,
-  },
-  {
-    id: "inv-002",
-    productoId: "prd-002",
-    sku: "SKU-PRD-104",
-    producto: "Aceite vegetal 1 gal",
-    sucursal: "Almacen Central",
-    stockNeto: 240,
-    umbralAlerta: 60,
-  },
-];
+function ensureDatabase() {
+  const directory = path.dirname(DATABASE_FILE);
+
+  if (!fs.existsSync(directory)) {
+    fs.mkdirSync(directory, { recursive: true });
+  }
+
+  if (!fs.existsSync(DATABASE_FILE)) {
+    fs.writeFileSync(DATABASE_FILE, JSON.stringify(seedData, null, 2));
+  }
+}
+
+function readDatabase() {
+  ensureDatabase();
+  return JSON.parse(fs.readFileSync(DATABASE_FILE, "utf8"));
+}
+
+function writeDatabase(database) {
+  fs.writeFileSync(DATABASE_FILE, JSON.stringify(database, null, 2));
+}
+
+function resetDatabaseForTests() {
+  writeDatabase(clone(seedData));
+}
 
 function sendJson(response, statusCode, data) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   });
   response.end(JSON.stringify(data, null, 2));
@@ -92,11 +124,164 @@ function readBody(request) {
 }
 
 function createId(prefix, collection) {
-  return `${prefix}-${String(collection.length + 1).padStart(3, "0")}`;
+  const maxId = collection.reduce((max, item) => {
+    const number = Number(String(item.id).replace(`${prefix}-`, ""));
+    return Number.isFinite(number) && number > max ? number : max;
+  }, 0);
+
+  return `${prefix}-${String(maxId + 1).padStart(3, "0")}`;
 }
 
 function validateRequired(data, fields) {
   return fields.filter((field) => !data[field]);
+}
+
+function getCollectionRoute(pathname) {
+  const match = pathname.match(/^\/(proveedores|productos|inventarios)(?:\/([^/]+))?$/);
+  return match ? { collectionName: match[1], id: match[2] } : null;
+}
+
+function findById(collection, id) {
+  return collection.find((item) => item.id === id);
+}
+
+function sendMissingFields(response, missing) {
+  sendJson(response, 400, { error: "Campos requeridos faltantes", missing });
+}
+
+function buildProveedor(body, id) {
+  return {
+    id,
+    razonSocial: body.razonSocial,
+    rnc: body.rnc,
+    telefono: body.telefono || null,
+    correo: body.correo || null,
+    estado: body.estado || "Activo",
+  };
+}
+
+function buildProducto(body, id) {
+  return {
+    id,
+    sku: body.sku,
+    codigoBarra: body.codigoBarra || null,
+    descripcion: body.descripcion,
+    categoria: body.categoria || "Sin categoria",
+  };
+}
+
+function buildInventario(body, id) {
+  return {
+    id,
+    productoId: body.productoId || null,
+    sku: body.sku,
+    producto: body.producto,
+    sucursal: body.sucursal,
+    stockNeto: Number(body.stockNeto || 0),
+    umbralAlerta: Number(body.umbralAlerta || 10),
+  };
+}
+
+function getCrudConfig(collectionName) {
+  const configs = {
+    proveedores: {
+      prefix: "prov",
+      required: ["razonSocial", "rnc"],
+      uniqueField: "rnc",
+      builder: buildProveedor,
+      duplicateMessage: "Ya existe un proveedor con este RNC",
+    },
+    productos: {
+      prefix: "prd",
+      required: ["sku", "descripcion"],
+      uniqueField: "sku",
+      builder: buildProducto,
+      duplicateMessage: "Ya existe un producto con este SKU",
+    },
+    inventarios: {
+      prefix: "inv",
+      required: ["sku", "producto", "sucursal"],
+      uniqueField: null,
+      builder: buildInventario,
+    },
+  };
+
+  return configs[collectionName];
+}
+
+function hasDuplicate(collection, field, value, ignoredId) {
+  if (!field) {
+    return false;
+  }
+
+  return collection.some((item) => item[field] === value && item.id !== ignoredId);
+}
+
+async function handleCreate(response, collectionName, body) {
+  const database = readDatabase();
+  const collection = database[collectionName];
+  const config = getCrudConfig(collectionName);
+  const missing = validateRequired(body, config.required);
+
+  if (missing.length) {
+    sendMissingFields(response, missing);
+    return;
+  }
+
+  if (hasDuplicate(collection, config.uniqueField, body[config.uniqueField])) {
+    sendJson(response, 409, { error: config.duplicateMessage });
+    return;
+  }
+
+  const record = config.builder(body, createId(config.prefix, collection));
+  collection.push(record);
+  writeDatabase(database);
+  sendJson(response, 201, record);
+}
+
+async function handleUpdate(response, collectionName, id, body) {
+  const database = readDatabase();
+  const collection = database[collectionName];
+  const config = getCrudConfig(collectionName);
+  const index = collection.findIndex((item) => item.id === id);
+
+  if (index === -1) {
+    sendJson(response, 404, { error: "Registro no encontrado" });
+    return;
+  }
+
+  const nextData = { ...collection[index], ...body };
+  const missing = validateRequired(nextData, config.required);
+
+  if (missing.length) {
+    sendMissingFields(response, missing);
+    return;
+  }
+
+  if (hasDuplicate(collection, config.uniqueField, nextData[config.uniqueField], id)) {
+    sendJson(response, 409, { error: config.duplicateMessage });
+    return;
+  }
+
+  const record = config.builder(nextData, id);
+  collection[index] = record;
+  writeDatabase(database);
+  sendJson(response, 200, record);
+}
+
+function handleDelete(response, collectionName, id) {
+  const database = readDatabase();
+  const collection = database[collectionName];
+  const index = collection.findIndex((item) => item.id === id);
+
+  if (index === -1) {
+    sendJson(response, 404, { error: "Registro no encontrado" });
+    return;
+  }
+
+  const [deleted] = collection.splice(index, 1);
+  writeDatabase(database);
+  sendJson(response, 200, { deleted });
 }
 
 async function router(request, response) {
@@ -112,95 +297,60 @@ async function router(request, response) {
     sendJson(response, 200, {
       status: "ok",
       service: "PREDICEX Backend",
+      database: "json-local",
       timestamp: new Date().toISOString(),
     });
     return;
   }
 
-  if (request.method === "GET" && pathname === "/proveedores") {
-    sendJson(response, 200, proveedores);
-    return;
-  }
+  const route = getCollectionRoute(pathname);
+  if (route) {
+    const database = readDatabase();
+    const collection = database[route.collectionName];
 
-  if (request.method === "POST" && pathname === "/proveedores") {
+    if (request.method === "GET" && route.collectionName === "inventarios" && !route.id) {
+      const alertas = url.searchParams.get("alertas");
+      const result =
+        alertas === "true"
+          ? collection.filter((item) => item.stockNeto <= item.umbralAlerta)
+          : collection;
+
+      sendJson(response, 200, result);
+      return;
+    }
+
+    if (request.method === "GET" && !route.id) {
+      sendJson(response, 200, collection);
+      return;
+    }
+
+    if (request.method === "GET" && route.id) {
+      const record = findById(collection, route.id);
+      sendJson(response, record ? 200 : 404, record || { error: "Registro no encontrado" });
+      return;
+    }
+
     try {
       const body = await readBody(request);
-      const missing = validateRequired(body, ["razonSocial", "rnc"]);
 
-      if (missing.length) {
-        sendJson(response, 400, { error: "Campos requeridos faltantes", missing });
+      if (request.method === "POST" && !route.id) {
+        await handleCreate(response, route.collectionName, body);
         return;
       }
 
-      const exists = proveedores.some((proveedor) => proveedor.rnc === body.rnc);
-      if (exists) {
-        sendJson(response, 409, { error: "Ya existe un proveedor con este RNC" });
+      if (request.method === "PUT" && route.id) {
+        await handleUpdate(response, route.collectionName, route.id, body);
         return;
       }
 
-      const proveedor = {
-        id: createId("prov", proveedores),
-        razonSocial: body.razonSocial,
-        rnc: body.rnc,
-        telefono: body.telefono || null,
-        correo: body.correo || null,
-        estado: body.estado || "Activo",
-      };
-
-      proveedores.push(proveedor);
-      sendJson(response, 201, proveedor);
+      if (request.method === "DELETE" && route.id) {
+        handleDelete(response, route.collectionName, route.id);
+        return;
+      }
     } catch (error) {
       sendJson(response, 400, { error: "JSON invalido" });
+      return;
     }
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/productos") {
-    sendJson(response, 200, productos);
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/productos") {
-    try {
-      const body = await readBody(request);
-      const missing = validateRequired(body, ["sku", "descripcion"]);
-
-      if (missing.length) {
-        sendJson(response, 400, { error: "Campos requeridos faltantes", missing });
-        return;
-      }
-
-      const exists = productos.some((producto) => producto.sku === body.sku);
-      if (exists) {
-        sendJson(response, 409, { error: "Ya existe un producto con este SKU" });
-        return;
-      }
-
-      const producto = {
-        id: createId("prd", productos),
-        sku: body.sku,
-        codigoBarra: body.codigoBarra || null,
-        descripcion: body.descripcion,
-        categoria: body.categoria || "Sin categoria",
-      };
-
-      productos.push(producto);
-      sendJson(response, 201, producto);
-    } catch (error) {
-      sendJson(response, 400, { error: "JSON invalido" });
-    }
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/inventarios") {
-    const alertas = url.searchParams.get("alertas");
-    const result =
-      alertas === "true"
-        ? inventarios.filter((item) => item.stockNeto <= item.umbralAlerta)
-        : inventarios;
-
-    sendJson(response, 200, result);
-    return;
   }
 
   sendJson(response, 404, {
@@ -208,10 +358,20 @@ async function router(request, response) {
     rutasDisponibles: [
       "GET /health",
       "GET /proveedores",
+      "GET /proveedores/:id",
       "POST /proveedores",
+      "PUT /proveedores/:id",
+      "DELETE /proveedores/:id",
       "GET /productos",
+      "GET /productos/:id",
       "POST /productos",
+      "PUT /productos/:id",
+      "DELETE /productos/:id",
       "GET /inventarios",
+      "GET /inventarios/:id",
+      "POST /inventarios",
+      "PUT /inventarios/:id",
+      "DELETE /inventarios/:id",
       "GET /inventarios?alertas=true",
     ],
   });
@@ -230,3 +390,4 @@ if (require.main === module) {
 }
 
 module.exports = server;
+module.exports.resetDatabaseForTests = resetDatabaseForTests;
