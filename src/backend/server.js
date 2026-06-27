@@ -2,6 +2,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const { URL } = require("url");
+const store = require("./sqlserver-store");
 
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_FILE = path.resolve(__dirname, "../database/data.json");
@@ -245,70 +246,18 @@ function hasDuplicate(collection, field, value, ignoredId) {
 }
 
 async function handleCreate(response, collectionName, body) {
-  const database = readDatabase();
-  const collection = database[collectionName];
-  const config = getCrudConfig(collectionName);
-  const missing = validateRequired(body, config.required);
-
-  if (missing.length) {
-    sendMissingFields(response, missing);
-    return;
-  }
-
-  if (hasDuplicate(collection, config.uniqueField, body[config.uniqueField])) {
-    sendJson(response, 409, { error: config.duplicateMessage });
-    return;
-  }
-
-  const record = config.builder(body, createId(config.prefix, collection));
-  collection.push(record);
-  writeDatabase(database);
-  sendJson(response, 201, record);
+  const result = await store.create(collectionName, body);
+  sendJson(response, result.status, result.data);
 }
 
 async function handleUpdate(response, collectionName, id, body) {
-  const database = readDatabase();
-  const collection = database[collectionName];
-  const config = getCrudConfig(collectionName);
-  const index = collection.findIndex((item) => item.id === id);
-
-  if (index === -1) {
-    sendJson(response, 404, { error: "Registro no encontrado" });
-    return;
-  }
-
-  const nextData = { ...collection[index], ...body };
-  const missing = validateRequired(nextData, config.required);
-
-  if (missing.length) {
-    sendMissingFields(response, missing);
-    return;
-  }
-
-  if (hasDuplicate(collection, config.uniqueField, nextData[config.uniqueField], id)) {
-    sendJson(response, 409, { error: config.duplicateMessage });
-    return;
-  }
-
-  const record = config.builder(nextData, id);
-  collection[index] = record;
-  writeDatabase(database);
-  sendJson(response, 200, record);
+  const result = await store.update(collectionName, id, body);
+  sendJson(response, result.status, result.data);
 }
 
-function handleDelete(response, collectionName, id) {
-  const database = readDatabase();
-  const collection = database[collectionName];
-  const index = collection.findIndex((item) => item.id === id);
-
-  if (index === -1) {
-    sendJson(response, 404, { error: "Registro no encontrado" });
-    return;
-  }
-
-  const [deleted] = collection.splice(index, 1);
-  writeDatabase(database);
-  sendJson(response, 200, { deleted });
+async function handleDelete(response, collectionName, id) {
+  const result = await store.remove(collectionName, id);
+  sendJson(response, result.status, result.data);
 }
 
 async function router(request, response) {
@@ -325,10 +274,13 @@ async function router(request, response) {
   }
 
   if (request.method === "GET" && pathname === "/health") {
+    const database = await store.health();
     sendJson(response, 200, {
       status: "ok",
       service: "PREDICEX Backend",
-      database: "json-local",
+      database: "sqlserver",
+      sqlServer: database.server,
+      sqlDatabase: database.database,
       timestamp: new Date().toISOString(),
     });
     return;
@@ -336,27 +288,19 @@ async function router(request, response) {
 
   const route = getCollectionRoute(pathname);
   if (route) {
-    const database = readDatabase();
-    const collection = database[route.collectionName];
-
     if (request.method === "GET" && route.collectionName === "inventarios" && !route.id) {
       const alertas = url.searchParams.get("alertas");
-      const result =
-        alertas === "true"
-          ? collection.filter((item) => item.stockNeto <= item.umbralAlerta)
-          : collection;
-
-      sendJson(response, 200, result);
+      sendJson(response, 200, await store.list(route.collectionName, { alertas }));
       return;
     }
 
     if (request.method === "GET" && !route.id) {
-      sendJson(response, 200, collection);
+      sendJson(response, 200, await store.list(route.collectionName));
       return;
     }
 
     if (request.method === "GET" && route.id) {
-      const record = findById(collection, route.id);
+      const record = await store.get(route.collectionName, route.id);
       sendJson(response, record ? 200 : 404, record || { error: "Registro no encontrado" });
       return;
     }
@@ -375,11 +319,11 @@ async function router(request, response) {
       }
 
       if (request.method === "DELETE" && route.id) {
-        handleDelete(response, route.collectionName, route.id);
+        await handleDelete(response, route.collectionName, route.id);
         return;
       }
     } catch (error) {
-      sendJson(response, 400, { error: "JSON invalido" });
+      sendJson(response, 400, { error: error.message || "JSON invalido" });
       return;
     }
   }

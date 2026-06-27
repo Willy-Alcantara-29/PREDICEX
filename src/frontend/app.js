@@ -86,6 +86,7 @@ function renderInventory() {
   inventoryTable.innerHTML = state.inventarios
     .map((item) => {
       const stock = Number(item.stockNeto);
+      const price = Number(item.precioUnitario || 0);
       const isEmpty = stock <= 0;
       const isLow = !isEmpty && stock <= item.umbralAlerta;
       const statusClass = isEmpty ? "empty" : isLow ? "low" : "ok";
@@ -96,6 +97,7 @@ function renderInventory() {
           <td><span class="row-icon product-icon"></span>${item.producto}</td>
           <td><span class="row-icon branch-icon"></span>${item.sucursal}</td>
           <td><strong>${stock.toLocaleString("es-DO")}</strong></td>
+          <td>${price.toLocaleString("es-DO", { style: "currency", currency: "DOP" })}</td>
           <td><span class="tag ${statusClass}">${statusText}</span></td>
           <td>${new Date().toLocaleDateString("es-DO")} ${new Date().toLocaleTimeString("es-DO", {
             hour: "2-digit",
@@ -173,7 +175,7 @@ function renderDashboard() {
   const lowStock = state.inventarios.filter((item) => item.stockNeto <= item.umbralAlerta).length;
   const activeBranches = new Set(state.inventarios.map((item) => item.sucursal)).size;
   const todayMovements = Math.max(4, state.inventarios.length + lowStock);
-  const estimatedInventoryValue = totalStock * 185;
+  const estimatedInventoryValue = state.inventarios.reduce((total, item) => total + Number(item.stockNeto) * Number(item.precioUnitario || 0), 0);
   const now = new Date();
   document.querySelector("#totalStockMetric").textContent = totalStock.toLocaleString("es-DO");
   document.querySelector("#lowStockMetric").textContent = lowStock;
