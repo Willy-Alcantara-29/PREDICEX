@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -262,7 +262,7 @@
                 <h3>Movimientos recientes</h3>
                 <span>Auditoria de stock</span>
               </div>
-              <ul class="activity-list">
+              <ul id="movementList" class="activity-list">
                 <li class="activity-card entry">
                   <span class="activity-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg></span>
                   <div>
@@ -351,6 +351,7 @@
               </article>
             </div>
 
+            <div class="form-helper-note">Aqui puedes registrar existencias, editar stock o preparar movimientos de inventario.</div>
             <form id="inventoryForm" class="crud-form">
               <label>
                 SKU
@@ -375,14 +376,42 @@
               <label>
                 Precio
                 <span class="field-shell stock-field"><input name="precioUnitario" type="number" min="0" step="0.01" placeholder="185.00" required /></span>
+              </label>              <button type="submit" class="small-button" data-default-text="Guardar inventario">Guardar inventario</button>
+            </form>
+
+            <form id="movementForm" class="crud-form movement-form">
+              <label>
+                Inventario
+                <select name="inventarioId" required></select>
               </label>
-              <button type="submit" class="small-button" data-default-text="Guardar inventario">Guardar inventario</button>
+              <label>
+                Tipo
+                <select name="tipo" required>
+                  <option>Entrada</option>
+                  <option>Salida</option>
+                  <option>Transferencia</option>
+                  <option>Ajuste</option>
+                </select>
+              </label>
+              <label>
+                Cantidad
+                <span class="field-shell stock-field"><input name="cantidad" type="number" min="0" placeholder="10" required /></span>
+              </label>
+              <label>
+                Destino
+                <span class="field-shell branch-field"><input name="sucursalDestino" placeholder="Sucursal Este" /></span>
+              </label>
+              <label>
+                Nota
+                <span class="field-shell product-description-field"><input name="nota" placeholder="Motivo del movimiento" /></span>
+              </label>
+              <button type="submit" class="small-button" data-default-text="Registrar movimiento">Registrar movimiento</button>
             </form>
 
             <div class="inventory-tools" aria-label="Herramientas de inventario">
               <label class="search-control">
                 <span>Buscar producto</span>
-                <input type="search" placeholder="Buscar por SKU, producto o sucursal" />
+                <input data-search="inventarios" type="search" placeholder="Buscar por SKU, producto o sucursal" />
               </label>
               <label>
                 <span>Sucursal</span>
@@ -401,7 +430,7 @@
                   <option>Sin Stock</option>
                 </select>
               </label>
-              <button type="button" class="export-button">Exportar Excel</button>
+              <button type="button" class="export-button" data-export="inventarios">Exportar Excel</button>
             </div>
 
             <div class="table-wrap">
@@ -465,6 +494,7 @@
               </article>
             </div>
 
+            <div class="form-helper-note">Aqui puedes crear un proveedor nuevo o actualizar sus datos de contacto y estado.</div>
             <form id="supplierForm" class="crud-form">
               <label>
                 Razon social
@@ -492,7 +522,7 @@
             <div class="supplier-tools" aria-label="Herramientas de proveedores">
               <label class="search-control">
                 <span>Buscar proveedor</span>
-                <input type="search" placeholder="Buscar por razon social, RNC o correo" />
+                <input data-search="proveedores" type="search" placeholder="Buscar por razon social, RNC o correo" />
               </label>
               <label>
                 <span>Estado</span>
@@ -572,6 +602,7 @@
               </article>
             </div>
 
+            <div class="form-helper-note">Aqui puedes crear un producto nuevo o editar la informacion del catalogo.</div>
             <form id="productForm" class="crud-form">
               <label>
                 SKU
@@ -588,6 +619,13 @@
               <label>
                 Categoria
                 <span class="field-shell product-category-field"><input name="categoria" placeholder="Alimentos" /></span>
+              </label>              <label>
+                Precio
+                <span class="field-shell stock-field"><input name="precio" type="number" min="0" step="0.01" placeholder="185.00" required /></span>
+              </label>
+              <label>
+                Estado
+                <span class="field-shell supplier-status-field"><input name="estado" placeholder="Activo" /></span>
               </label>
               <button type="submit" class="small-button" data-default-text="Guardar producto">Guardar producto</button>
             </form>
@@ -595,7 +633,7 @@
             <div class="product-tools" aria-label="Herramientas de productos">
               <label class="search-control">
                 <span>Buscar producto</span>
-                <input type="search" placeholder="Buscar por SKU, descripcion o codigo" />
+                <input data-search="productos" type="search" placeholder="Buscar por SKU, descripcion o codigo" />
               </label>
               <label>
                 <span>Categoria</span>
@@ -621,7 +659,7 @@
                   <option>Bajo stock</option>
                 </select>
               </label>
-              <button type="button" class="export-button">Exportar Excel</button>
+              <button type="button" class="export-button" data-export="productos">Exportar Excel</button>
             </div>
 
             <div class="table-wrap">
@@ -632,6 +670,8 @@
                     <th>Descripcion</th>
                     <th>Codigo barra</th>
                     <th>Categoria</th>
+                    <th>Precio</th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -646,3 +686,10 @@
     <script src="./app.js"></script>
   </body>
 </html>
+
+
+
+
+
+
+

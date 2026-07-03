@@ -1,4 +1,4 @@
-const assert = require("assert");
+﻿const assert = require("assert");
 const server = require("../../src/backend/server");
 
 const PORT = 3100;
@@ -158,6 +158,49 @@ async function run() {
     });
     assert.strictEqual(borrarInventario.response.status, 200);
 
+
+    const nuevoCliente = await request("/clientes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: "Cliente Demo Prueba",
+        documento: "001-5555555-5",
+        telefono: "809-555-5555",
+        correo: "cliente.demo@example.com",
+        estado: "Activo",
+      }),
+    });
+    assert.strictEqual(nuevoCliente.response.status, 201);
+    assert.strictEqual(nuevoCliente.data.documento, "001-5555555-5");
+
+    const nuevoPrestamo = await request("/prestamos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clienteId: nuevoCliente.data.id,
+        monto: 25000,
+        tasa: 12,
+        plazoMeses: 10,
+        balancePendiente: 25000,
+        estado: "Activo",
+      }),
+    });
+    assert.strictEqual(nuevoPrestamo.response.status, 201);
+    assert.strictEqual(nuevoPrestamo.data.clienteId, nuevoCliente.data.id);
+
+    const nuevoPago = await request("/pagos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prestamoId: nuevoPrestamo.data.id,
+        monto: 2500,
+        metodo: "Efectivo",
+        referencia: "TEST-001",
+        estado: "Aplicado",
+      }),
+    });
+    assert.strictEqual(nuevoPago.response.status, 201);
+    assert.strictEqual(nuevoPago.data.prestamoId, nuevoPrestamo.data.id);
     console.log("Pruebas backend OK");
   } finally {
     await stopServer();
@@ -169,3 +212,5 @@ run().catch(async (error) => {
   console.error(error);
   process.exit(1);
 });
+
+
