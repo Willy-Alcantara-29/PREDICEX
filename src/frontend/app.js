@@ -8,6 +8,7 @@ const state = {
   clientes: [],
   prestamos: [],
   pagos: [],
+  sucursalesMeta: {},
   filters: {
     proveedores: { search: "", estado: "Todos", rnc: "Todos" },
     productos: { search: "", categoria: "Todas", estado: "Todos" },
@@ -15,9 +16,24 @@ const state = {
     clientes: { search: "", estado: "Todos" },
     prestamos: { search: "", estado: "Todos" },
     pagos: { search: "", estado: "Todos" },
+    alertas: { search: "", sucursal: "Todas", severidad: "Todas" },
+    sucursales: { search: "", estado: "Todos" },
   },
-  editing: { proveedores: null, productos: null, inventarios: null, clientes: null, prestamos: null, pagos: null },
+  editing: { proveedores: null, productos: null, inventarios: null, clientes: null, prestamos: null, pagos: null, sucursales: null },
 };
+
+const BRANCH_META_KEY = "predicex_sucursales_meta";
+function loadBranchMeta() {
+  try {
+    return JSON.parse(localStorage.getItem(BRANCH_META_KEY)) || {};
+  } catch (error) {
+    return {};
+  }
+}
+function saveBranchMeta(meta) {
+  localStorage.setItem(BRANCH_META_KEY, JSON.stringify(meta));
+}
+state.sucursalesMeta = loadBranchMeta();
 
 
 function injectFinancialModules() {
@@ -62,6 +78,67 @@ function injectFinancialModules() {
   `);
 }
 
+function injectOperationalModules() {
+  const navList = document.querySelector(".nav-list");
+  const workspace = document.querySelector(".workspace");
+  const productsNavItem = navList?.querySelector('[data-view="productsView"]');
+  if (!navList || !workspace || document.querySelector("#alertsView")) return;
+
+  productsNavItem?.insertAdjacentHTML("afterend", `
+    <button class="nav-item" data-view="alertsView"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg><span>Alertas</span></button>
+    <button class="nav-item" data-view="branchesView"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg><span>Sucursales</span></button>
+  `);
+
+  workspace.insertAdjacentHTML("beforeend", `
+    <section id="alertsView" class="view">
+      <article class="panel products-panel">
+        <div class="panel-heading products-heading"><div><p class="eyebrow">Monitoreo de quiebres de stock</p><h3>Alertas de Inventario</h3><span>Productos bajo umbral o sin existencia, calculado en tiempo real</span></div></div>
+        <div class="product-kpis" aria-label="Indicadores de alertas">
+          <article><span class="product-kpi-icon low" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg></span><div><strong id="alertTotalKpi">0</strong><span>Alertas activas</span></div></article>
+          <article><span class="product-kpi-icon low" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></span><div><strong id="alertOutOfStockKpi">0</strong><span>Sin stock</span></div></article>
+          <article><span class="product-kpi-icon category" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg></span><div><strong id="alertLowStockKpi">0</strong><span>Bajo umbral</span></div></article>
+          <article><span class="product-kpi-icon total" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 1v22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></span><div><strong id="alertValueKpi">RD$ 0</strong><span>Valor en riesgo</span></div></article>
+        </div>
+        <div class="form-helper-note">Estas alertas se generan automaticamente cuando el stock de un producto llega al umbral configurado en Inventario.</div>
+        <div class="product-tools module-tools" aria-label="Herramientas de alertas">
+          <label class="search-control"><span>Buscar alerta</span><input data-search="alertas" type="search" placeholder="Buscar por SKU, producto o sucursal" /></label>
+          <label><span>Sucursal</span><select id="alertBranchFilter" data-filter="alertas.sucursal"><option>Todas</option></select></label>
+          <label><span>Severidad</span><select data-filter="alertas.severidad"><option>Todas</option><option>Bajo Umbral</option><option>Sin Stock</option></select></label>
+          <button type="button" class="export-button" data-export="alertas">Exportar Excel</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Producto</th><th>Sucursal</th><th>Stock actual</th><th>Umbral</th><th>Severidad</th><th>Valor en riesgo</th><th>Acciones</th></tr></thead><tbody id="alertTable"></tbody></table></div>
+      </article>
+    </section>
+    <section id="branchesView" class="view">
+      <article class="panel products-panel">
+        <div class="panel-heading products-heading"><div><p class="eyebrow">Red de distribucion</p><h3>Sucursales CRUD</h3><span>Puntos de venta y almacenes conectados al inventario</span></div></div>
+        <div class="product-kpis" aria-label="Indicadores de sucursales">
+          <article><span class="product-kpi-icon total" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg></span><div><strong id="branchTotalKpi">0</strong><span>Sucursales</span></div></article>
+          <article><span class="product-kpi-icon best" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 17 9 11l4 4 8-8" /><path d="M14 7h7v7" /></svg></span><div><strong id="branchTopStockKpi">--</strong><span>Mayor stock</span></div></article>
+          <article><span class="product-kpi-icon low" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg></span><div><strong id="branchAlertKpi">0</strong><span>Con alertas</span></div></article>
+          <article><span class="product-kpi-icon category" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 1v22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></span><div><strong id="branchValueKpi">RD$ 0</strong><span>Valor total inventario</span></div></article>
+        </div>
+        <div class="form-helper-note">Registra una sucursal para habilitarla en Inventario y Movimientos. Las metricas de stock se calculan con el inventario asociado.</div>
+        <form id="branchForm" class="crud-form">
+          <label>Nombre<span class="field-shell branch-field"><input name="nombre" placeholder="Sucursal Sur" required /></span></label>
+          <label>Direccion<span class="field-shell product-description-field"><input name="direccion" placeholder="Av. Principal #123" /></span></label>
+          <label>Encargado<span class="field-shell supplier-company-field"><input name="encargado" placeholder="Nombre del encargado" /></span></label>
+          <label>Telefono<span class="field-shell supplier-phone-field"><input name="telefono" placeholder="809-555-0199" /></span></label>
+          <label>Estado<span class="field-shell supplier-status-field"><input name="estado" placeholder="Activa" /></span></label>
+          <button type="submit" class="small-button" data-default-text="Guardar sucursal">Guardar sucursal</button>
+        </form>
+        <div class="product-tools module-tools" aria-label="Herramientas de sucursales">
+          <label class="search-control"><span>Buscar sucursal</span><input data-search="sucursales" type="search" placeholder="Buscar por nombre, encargado o direccion" /></label>
+          <label><span>Estado</span><select data-filter="sucursales.estado"><option>Todos</option><option>Activa</option><option>Inactiva</option></select></label>
+          <button type="button" class="export-button" data-export="sucursales">Exportar Excel</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Sucursal</th><th>Encargado</th><th>Telefono</th><th>Productos</th><th>Stock total</th><th>Valor inventario</th><th>Alertas</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="branchTable"></tbody></table></div>
+      </article>
+    </section>
+  `);
+}
+
+injectOperationalModules();
 injectFinancialModules();
 function injectDashboardOperationsPanel() {
   const dashboard = document.querySelector("#dashboardView");
@@ -95,6 +172,9 @@ const productTable = document.querySelector("#productTable");
 const clientTable = document.querySelector("#clientTable");
 const loanTable = document.querySelector("#loanTable");
 const paymentTable = document.querySelector("#paymentTable");
+const alertTable = document.querySelector("#alertTable");
+const branchTable = document.querySelector("#branchTable");
+const branchForm = document.querySelector("#branchForm");
 const movementList = document.querySelector("#movementList");
 const addStockButton = document.querySelector("#addStockButton");
 const supplierForm = document.querySelector("#supplierForm");
@@ -117,6 +197,8 @@ const titles = {
   clientsView: "Clientes",
   loansView: "Prestamos",
   paymentsView: "Pagos",
+  alertsView: "Alertas de Inventario",
+  branchesView: "Sucursales",
 };
 
 function setStatus(message, type = "info") {
@@ -469,6 +551,178 @@ function renderPayments() {
   paymentTable.innerHTML = rows.map((payment) => `
     <tr><td>${payment.cliente}</td><td>${payment.prestamoId}</td><td>${money(payment.monto)}</td><td>${payment.metodo}</td><td>${payment.referencia || "-"}</td><td>${payment.fecha || "-"}</td><td><span class="tag ${tagClass(payment.estado)}">${payment.estado}</span></td><td class="table-actions"><button type="button" data-action="edit-payment" data-id="${payment.id}">Editar</button><button type="button" data-action="delete-payment" data-id="${payment.id}">Eliminar</button></td></tr>`).join("");
 }
+
+function alertItems() {
+  return state.inventarios.filter((item) => Number(item.stockNeto || 0) <= Number(item.umbralAlerta || 0));
+}
+
+function filteredAlerts() {
+  const filter = state.filters.alertas;
+  return alertItems().filter((item) => {
+    const severity = Number(item.stockNeto || 0) <= 0 ? "Sin Stock" : "Bajo Umbral";
+    const haystack = normalize(`${item.sku} ${item.producto} ${item.sucursal}`);
+    const matchesSearch = !filter.search || haystack.includes(normalize(filter.search));
+    const matchesBranch = filter.sucursal === "Todas" || item.sucursal === filter.sucursal;
+    const matchesSeverity = filter.severidad === "Todas" || severity === filter.severidad;
+    return matchesSearch && matchesBranch && matchesSeverity;
+  });
+}
+
+function renderAlerts() {
+  if (!alertTable) return;
+  const all = alertItems();
+  const rows = filteredAlerts();
+  const outOfStock = all.filter((item) => Number(item.stockNeto || 0) <= 0);
+  const riskValue = all.reduce((sum, item) => sum + Number(item.stockNeto || 0) * Number(item.precioUnitario || 0), 0);
+  document.querySelector("#alertTotalKpi").textContent = all.length;
+  document.querySelector("#alertOutOfStockKpi").textContent = outOfStock.length;
+  document.querySelector("#alertLowStockKpi").textContent = all.length - outOfStock.length;
+  document.querySelector("#alertValueKpi").textContent = money(riskValue);
+  const branchFilter = document.querySelector("#alertBranchFilter");
+  if (branchFilter) {
+    const current = branchFilter.value;
+    const branches = Array.from(new Set(state.inventarios.map((item) => item.sucursal).filter(Boolean)));
+    branchFilter.innerHTML = `<option>Todas</option>${branches.map((name) => `<option>${name}</option>`).join("")}`;
+    branchFilter.value = branches.includes(current) ? current : "Todas";
+  }
+  alertTable.innerHTML = rows.map((item) => {
+    const severity = Number(item.stockNeto || 0) <= 0 ? "Sin Stock" : "Bajo Umbral";
+    const riskItemValue = Number(item.stockNeto || 0) * Number(item.precioUnitario || 0);
+    return `
+      <tr>
+        <td><span class="row-icon sku-icon"></span>${item.sku}</td>
+        <td>${item.producto}</td>
+        <td><span class="row-icon branch-icon"></span>${item.sucursal}</td>
+        <td><strong>${Number(item.stockNeto || 0).toLocaleString("es-DO")}</strong></td>
+        <td>${Number(item.umbralAlerta || 0).toLocaleString("es-DO")}</td>
+        <td><span class="tag ${severity === "Sin Stock" ? "empty" : "low"}">${severity}</span></td>
+        <td>${money(riskItemValue)}</td>
+        <td class="table-actions"><button type="button" data-action="restock-alert" data-id="${item.id}">Reabastecer</button></td>
+      </tr>`;
+  }).join("");
+}
+
+async function restockAlert(id) {
+  const item = state.inventarios.find((inv) => inv.id === id);
+  if (!item) return;
+  const target = Math.max(Number(item.umbralAlerta || 0) * 2, Number(item.umbralAlerta || 0) + 10);
+  const cantidad = Math.max(target - Number(item.stockNeto || 0), 1);
+  try {
+    await apiRequest("/inventarios/movimientos", { method: "POST", body: JSON.stringify({ inventarioId: item.id, tipo: "Entrada", cantidad, nota: "Reabastecimiento desde Alertas" }) });
+    await loadData();
+    setStatus("Reabastecimiento registrado correctamente.", "ok");
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
+}
+
+function branchList() {
+  const meta = state.sucursalesMeta;
+  const fromInventory = new Set(state.inventarios.map((item) => item.sucursal).filter(Boolean));
+  const names = new Set([...fromInventory, ...Object.keys(meta)]);
+  return Array.from(names).map((nombre) => {
+    const items = state.inventarios.filter((item) => item.sucursal === nombre);
+    const productos = new Set(items.map((item) => item.sku)).size;
+    const stockTotal = items.reduce((sum, item) => sum + Number(item.stockNeto || 0), 0);
+    const valorInventario = items.reduce((sum, item) => sum + Number(item.stockNeto || 0) * Number(item.precioUnitario || 0), 0);
+    const alertas = items.filter((item) => Number(item.stockNeto || 0) <= Number(item.umbralAlerta || 0)).length;
+    const info = meta[nombre] || {};
+    return {
+      nombre,
+      productos,
+      stockTotal,
+      valorInventario,
+      alertas,
+      hasInventory: items.length > 0,
+      direccion: info.direccion || "",
+      encargado: info.encargado || "",
+      telefono: info.telefono || "",
+      estado: info.estado || "Activa",
+    };
+  });
+}
+
+function filteredBranches() {
+  const filter = state.filters.sucursales;
+  return branchList().filter((item) => {
+    const haystack = normalize(`${item.nombre} ${item.encargado} ${item.direccion}`);
+    const matchesSearch = !filter.search || haystack.includes(normalize(filter.search));
+    const matchesStatus = filter.estado === "Todos" || item.estado === filter.estado;
+    return matchesSearch && matchesStatus;
+  });
+}
+
+function renderBranches() {
+  if (!branchTable) return;
+  const all = branchList();
+  const rows = filteredBranches();
+  const topBranch = all.slice().sort((a, b) => b.stockTotal - a.stockTotal)[0];
+  const withAlerts = all.filter((item) => item.alertas > 0).length;
+  const totalValue = all.reduce((sum, item) => sum + item.valorInventario, 0);
+  document.querySelector("#branchTotalKpi").textContent = all.length;
+  document.querySelector("#branchTopStockKpi").textContent = topBranch ? topBranch.nombre : "--";
+  document.querySelector("#branchAlertKpi").textContent = withAlerts;
+  document.querySelector("#branchValueKpi").textContent = money(totalValue);
+  branchTable.innerHTML = rows.map((branch) => `
+    <tr>
+      <td><span class="row-icon branch-icon"></span>${branch.nombre}</td>
+      <td>${branch.encargado || "-"}</td>
+      <td>${branch.telefono || "-"}</td>
+      <td>${branch.productos}</td>
+      <td><strong>${branch.stockTotal.toLocaleString("es-DO")}</strong></td>
+      <td>${money(branch.valorInventario)}</td>
+      <td><span class="tag ${branch.alertas ? "low" : "ok"}">${branch.alertas}</span></td>
+      <td><span class="tag ${tagClass(branch.estado)}">${branch.estado}</span></td>
+      <td class="table-actions">
+        <button type="button" data-action="edit-branch" data-id="${branch.nombre}">Editar</button>
+        <button type="button" data-action="delete-branch" data-id="${branch.nombre}"${branch.hasInventory ? " disabled title=\"Tiene inventario asociado\"" : ""}>Eliminar</button>
+      </td>
+    </tr>`).join("");
+}
+
+function saveBranch(form) {
+  const data = getFormData(form);
+  if (!data.nombre) {
+    setStatus("El nombre de la sucursal es obligatorio.", "error");
+    return;
+  }
+  const meta = state.sucursalesMeta;
+  const editingName = state.editing.sucursales;
+  if (editingName && editingName !== data.nombre) delete meta[editingName];
+  meta[data.nombre] = { direccion: data.direccion, encargado: data.encargado, telefono: data.telefono, estado: data.estado || "Activa" };
+  saveBranchMeta(meta);
+  clearForm(form, "sucursales");
+  renderAll();
+  setStatus(editingName ? "Sucursal actualizada correctamente." : "Sucursal creada correctamente.", "ok");
+}
+
+function editBranch(nombre) {
+  const branch = branchList().find((item) => item.nombre === nombre);
+  if (!branch || !branchForm) return;
+  branchForm.elements.nombre.value = branch.nombre;
+  branchForm.elements.direccion.value = branch.direccion || "";
+  branchForm.elements.encargado.value = branch.encargado || "";
+  branchForm.elements.telefono.value = branch.telefono || "";
+  branchForm.elements.estado.value = branch.estado || "Activa";
+  state.editing.sucursales = nombre;
+  branchForm.querySelector("button[type='submit']").textContent = "Actualizar";
+  branchForm.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function deleteBranch(nombre) {
+  const branch = branchList().find((item) => item.nombre === nombre);
+  if (branch?.hasInventory) {
+    setStatus("No puedes eliminar una sucursal con inventario asociado.", "error");
+    return;
+  }
+  if (!window.confirm("Confirma que deseas eliminar esta sucursal.")) return;
+  const meta = state.sucursalesMeta;
+  delete meta[nombre];
+  saveBranchMeta(meta);
+  renderAll();
+  setStatus("Sucursal eliminada correctamente.", "ok");
+}
+
 function renderAll() {
   renderSuppliers();
   renderProducts();
@@ -478,6 +732,8 @@ function renderAll() {
   renderClients();
   renderLoans();
   renderPayments();
+  renderAlerts();
+  renderBranches();
 }
 
 async function loadData() {
@@ -560,6 +816,8 @@ function exportRows(collectionName) {
     clientes: filteredClients(),
     prestamos: filteredLoans(),
     pagos: filteredPayments(),
+    alertas: filteredAlerts(),
+    sucursales: filteredBranches(),
   };
   const rows = datasets[collectionName] || [];
   if (!rows.length) {
@@ -656,6 +914,7 @@ movementForm?.addEventListener("submit", (event) => { event.preventDefault(); sa
 clientForm?.addEventListener("submit", (event) => { event.preventDefault(); saveRecord("clientes", clientForm); });
 loanForm?.addEventListener("submit", (event) => { event.preventDefault(); saveRecord("prestamos", loanForm); });
 paymentForm?.addEventListener("submit", (event) => { event.preventDefault(); saveRecord("pagos", paymentForm); });
+branchForm?.addEventListener("submit", (event) => { event.preventDefault(); saveBranch(branchForm); });
 
 document.addEventListener("click", async (event) => {
   const target = event.target.closest("button");
@@ -675,6 +934,9 @@ document.addEventListener("click", async (event) => {
   if (action === "delete-client") await deleteRecord("clientes", id);
   if (action === "delete-loan") await deleteRecord("prestamos", id);
   if (action === "delete-payment") await deleteRecord("pagos", id);
+  if (action === "restock-alert") await restockAlert(id);
+  if (action === "edit-branch") editBranch(id);
+  if (action === "delete-branch") deleteBranch(id);
 });
 
 addStockButton.addEventListener("click", async () => {
