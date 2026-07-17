@@ -6,6 +6,6 @@
   "scripts": {
     "start:backend": "node src/backend/server.js",
     "test:backend": "node tests/backend/api.test.js",
-    "db:init": "sqlcmd -S ElerSync -E -i src/database/sqlserver.sql"
+    "db:init": "node -e \"require('./src/backend/load-env'); const { execFileSync } = require('node:child_process'); const server = process.env.SQL_SERVER || 'localhost'; execFileSync('sqlcmd', ['-S', server, '-E', '-i', 'src/database/sqlserver.sql'], { stdio: 'inherit' });\""
   }
 }

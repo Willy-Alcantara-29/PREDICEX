@@ -2,6 +2,7 @@
 const http = require("http");
 const path = require("path");
 const { URL } = require("url");
+require("./load-env");
 const { handleApi, sendJson } = require("./controllers/http-controller");
 const supplyService = require("./services/supply-service");
 

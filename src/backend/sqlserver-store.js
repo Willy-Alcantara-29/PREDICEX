@@ -1,6 +1,8 @@
 const { execFile } = require("node:child_process");
 
-const SQL_SERVER = process.env.SQL_SERVER || "ElerSync";
+require("./load-env");
+
+const SQL_SERVER = process.env.SQL_SERVER || "localhost";
 const SQL_DATABASE = process.env.SQL_DATABASE || "PREDICEX";
 
 const configs = {
