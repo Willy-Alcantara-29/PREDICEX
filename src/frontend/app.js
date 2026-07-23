@@ -1975,7 +1975,7 @@ function ensureSidebarShell() {
   if (!appShell || !sidebar || document.querySelector("#sidebarToggle")) return;
   appShell.insertAdjacentHTML("afterbegin", `<button id="mobileMenuButton" class="mobile-menu-button" type="button" aria-label="Abrir menu">${menuIcon("menu")}</button><div id="sidebarOverlay" class="sidebar-overlay" tabindex="-1"></div>`);
   sidebar.querySelector(".brand-row")?.insertAdjacentHTML("beforeend", `<button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Contraer menu" title="Contraer menu">${menuIcon("collapse")}</button>`);
-  sidebar.insertAdjacentHTML("beforeend", `<div class="sidebar-footer"><div class="connected-user"><strong id="connectedUserName">Administrador</strong><span id="connectedUserRole">Administrador</span></div><button class="nav-item footer-settings" type="button" data-view="settingsView" title="Configuracion">${menuIcon("settings")}<span>Configuracion</span></button></div>`);
+  sidebar.insertAdjacentHTML("beforeend", `<div class="sidebar-footer"><div class="connected-user"><strong id="connectedUserName">Administrador</strong><span id="connectedUserRole">Administrador</span></div></div>`);
   const footer = sidebar.querySelector(".sidebar-footer");
   const logout = document.querySelector("#logoutButton");
   if (footer && logout) {
@@ -2051,6 +2051,7 @@ showApp = function() {
   previousShowAppForSidebar();
   initializeProfessionalSidebar();
 };
+
 
 
 

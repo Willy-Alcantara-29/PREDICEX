@@ -2935,8 +2935,7 @@ select:focus,
 }
 
 .nav-item,
-.ghost-button,
-.footer-settings {
+.ghost-button {
   min-height: 42px;
   border-radius: 12px;
   padding: 10px 12px;
@@ -2999,8 +2998,7 @@ select:focus,
 .sidebar.is-collapsed .section-label,
 .sidebar.is-collapsed .nav-item span,
 .sidebar.is-collapsed .ghost-button span,
-.sidebar.is-collapsed .connected-user,
-.sidebar.is-collapsed .footer-settings span {
+.sidebar.is-collapsed .connected-user {
   display: none;
 }
 
@@ -3022,15 +3020,13 @@ select:focus,
 }
 
 .sidebar.is-collapsed .nav-item,
-.sidebar.is-collapsed .ghost-button,
-.sidebar.is-collapsed .footer-settings {
+.sidebar.is-collapsed .ghost-button {
   justify-content: center;
   padding: 10px;
 }
 
 .sidebar.is-collapsed .nav-item::after,
-.sidebar.is-collapsed .ghost-button::after,
-.sidebar.is-collapsed .footer-settings::after {
+.sidebar.is-collapsed .ghost-button::after::after {
   content: attr(title);
   position: absolute;
   left: calc(100% + 10px);
@@ -3051,11 +3047,9 @@ select:focus,
 }
 
 .sidebar.is-collapsed .nav-item:hover::after,
-.sidebar.is-collapsed .ghost-button:hover::after,
-.sidebar.is-collapsed .footer-settings:hover::after,
+.sidebar.is-collapsed .ghost-button:hover::after:hover::after,
 .sidebar.is-collapsed .nav-item:focus-visible::after,
-.sidebar.is-collapsed .ghost-button:focus-visible::after,
-.sidebar.is-collapsed .footer-settings:focus-visible::after {
+.sidebar.is-collapsed .ghost-button:focus-visible::after:focus-visible::after {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
 }
@@ -3141,8 +3135,7 @@ select:focus,
   .sidebar.is-collapsed .section-label,
   .sidebar.is-collapsed .nav-item span,
   .sidebar.is-collapsed .ghost-button span,
-  .sidebar.is-collapsed .connected-user,
-  .sidebar.is-collapsed .footer-settings span {
+  .sidebar.is-collapsed .connected-user {
     display: initial;
   }
 
@@ -3445,3 +3438,5 @@ select:focus,
     width: 100%;
   }
 }
+
+
