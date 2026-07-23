@@ -1,0 +1,7 @@
+{
+  "empresaNombre": "PREDICEX",
+  "moneda": "DOP",
+  "zonaHoraria": "America/Santo_Domingo",
+  "registrosPorPagina": 20,
+  "respaldoDirectorio": "C:\\PredicexBackups"
+}

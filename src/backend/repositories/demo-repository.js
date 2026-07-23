@@ -1,4 +1,4 @@
-﻿const fs = require("fs");
+const fs = require("fs");
 const path = require("path");
 const { cloneSeedData } = require("../models/seed-data");
 
@@ -18,6 +18,7 @@ function normalizeDatabase(database) {
     clientes: Array.isArray(database.clientes) && database.clientes.length ? database.clientes : seed.clientes,
     prestamos: Array.isArray(database.prestamos) && database.prestamos.length ? database.prestamos : seed.prestamos,
     pagos: Array.isArray(database.pagos) && database.pagos.length ? database.pagos : seed.pagos,
+    sucursales: Array.isArray(database.sucursales) && database.sucursales.length ? database.sucursales : Array.from(new Set((database.inventarios || seed.inventarios).map((item) => item.sucursal))).map((nombre, index) => ({ id: `suc-${String(index + 1).padStart(3, "0")}`, nombre })),
   };
 }
 
@@ -55,7 +56,7 @@ function nextId(prefix, collection) {
 function statusForInventory(item) {
   const stock = Number(item.stockNeto || 0);
   if (stock <= 0) return "Sin Stock";
-  if (stock <= Number(item.umbralAlerta || 0)) return "Bajo Umbral";
+  if (stock <= Number(item.umbralAlerta || 0)) return "Bajo stock";
   return "Disponible";
 }
 
@@ -89,6 +90,7 @@ function getCollections(database) {
     clientes: database.clientes,
     prestamos: database.prestamos,
     pagos: database.pagos,
+    sucursales: database.sucursales,
   };
 }
 
@@ -129,7 +131,11 @@ async function get(collectionName, id) {
 async function create(collectionName, body) {
   const database = readDatabase();
   const collection = getCollections(database)[collectionName];
-  const prefixes = { proveedores: "prov", productos: "prd", inventarios: "inv", movimientos: "mov", clientes: "cli", prestamos: "pre", pagos: "pag" };
+  const prefixes = { proveedores: "prov", productos: "prd", inventarios: "inv", movimientos: "mov", clientes: "cli", prestamos: "pre", pagos: "pag", sucursales: "suc" };
+
+  if (collectionName === "sucursales" && collection.some((item) => item.nombre === body.nombre)) {
+    return { status: 409, data: { error: "Ya existe una sucursal con este nombre" } };
+  }
 
   if (collectionName === "productos" && collection.some((item) => item.sku === body.sku)) {
     return { status: 409, data: { error: "Ya existe un producto con este SKU" } };
@@ -142,6 +148,9 @@ async function create(collectionName, body) {
   }
 
   let record = { id: nextId(prefixes[collectionName], collection), ...body };
+  if (collectionName === "sucursales") {
+    record = { id: record.id, nombre: body.nombre };
+  }
   if (collectionName === "productos") {
     record = {
       id: record.id,
@@ -173,7 +182,9 @@ async function create(collectionName, body) {
   if (collectionName === "pagos") {
     const prestamo = database.prestamos.find((item) => item.id === body.prestamoId);
     record = { ...record, cliente: prestamo?.cliente || body.cliente || "Cliente no definido", monto: Number(body.monto || 0), fecha: body.fecha || new Date().toISOString().slice(0, 10), estado: body.estado || "Aplicado" };
-    if (prestamo && record.estado === "Aplicado") prestamo.balancePendiente = Math.max(0, Number(prestamo.balancePendiente || 0) - record.monto);
+    if (!prestamo) return { status: 404, data: { error: "Prestamo no encontrado" } };
+    if (record.estado === "Aplicado" && Number(prestamo.balancePendiente || 0) < record.monto) return { status: 409, data: { error: "El pago no puede superar el balance pendiente" } };
+    if (record.estado === "Aplicado") { prestamo.balancePendiente = Number(prestamo.balancePendiente || 0) - record.monto; if (prestamo.balancePendiente <= 0) prestamo.estado = "Cerrado"; }
   }
   if (collectionName === "movimientos") {
     record = { ...record, cantidad: Number(body.cantidad || 0), creadoEn: new Date().toISOString() };
@@ -192,6 +203,14 @@ async function update(collectionName, id, body) {
     return { status: 404, data: { error: "Registro no encontrado" } };
   }
 
+  if (collectionName === "sucursales" && collection.some((item) => item.nombre === body.nombre)) {
+    return { status: 409, data: { error: "Ya existe una sucursal con este nombre" } };
+  }
+
+  if (collectionName === "sucursales" && collection.some((item) => item.nombre === body.nombre && item.id !== id)) {
+    return { status: 409, data: { error: "Ya existe una sucursal con este nombre" } };
+  }
+
   if (collectionName === "productos" && collection.some((item) => item.sku === body.sku && item.id !== id)) {
     return { status: 409, data: { error: "Ya existe un producto con este SKU" } };
   }
@@ -203,6 +222,9 @@ async function update(collectionName, id, body) {
   }
 
   let record = { ...collection[index], ...body };
+  if (collectionName === "sucursales") {
+    record = { id: record.id, nombre: body.nombre };
+  }
   if (collectionName === "productos") {
     record.precio = Number(record.precio || 0);
     database.inventarios.forEach((item) => {
@@ -240,14 +262,25 @@ async function remove(collectionName, id) {
   const database = readDatabase();
   const collection = getCollections(database)[collectionName];
   const index = collection.findIndex((item) => item.id === id);
-  if (index === -1) {
-    return { status: 404, data: { error: "Registro no encontrado" } };
+  if (index === -1) return { status: 404, data: { error: "Registro no encontrado" } };
+  const current = collection[index];
+  if (["proveedores", "productos", "clientes"].includes(collectionName)) {
+    collection[index] = { ...current, estado: "Inactivo" };
+    writeDatabase(database);
+    return { status: 200, data: { deactivated: collection[index], reason: "Eliminacion logica" } };
+  }
+  if (["prestamos", "pagos"].includes(collectionName)) {
+    collection[index] = { ...current, estado: "Anulado" };
+    writeDatabase(database);
+    return { status: 200, data: { deactivated: collection[index], reason: "Eliminacion logica" } };
+  }
+  if (collectionName === "inventarios" && database.movimientos.some((item) => item.sku === current.sku)) {
+    return { status: 409, data: { error: "El inventario tiene movimientos relacionados; no se puede eliminar fisicamente" } };
   }
   const [deleted] = collection.splice(index, 1);
   writeDatabase(database);
   return { status: 200, data: { deleted } };
 }
-
 async function registerMovement(body) {
   const database = readDatabase();
   const quantity = Number(body.cantidad || 0);
@@ -258,10 +291,11 @@ async function registerMovement(body) {
 
   const type = body.tipo;
   if (type === "Entrada") inventory.stockNeto = Number(inventory.stockNeto) + quantity;
-  if (type === "Salida") inventory.stockNeto = Math.max(0, Number(inventory.stockNeto) - quantity);
+  if (type === "Salida") { if (Number(inventory.stockNeto) < quantity) return { status: 409, data: { error: "Stock insuficiente para completar el movimiento" } }; inventory.stockNeto = Number(inventory.stockNeto) - quantity; }
   if (type === "Ajuste") inventory.stockNeto = Math.max(0, quantity);
   if (type === "Transferencia") {
-    inventory.stockNeto = Math.max(0, Number(inventory.stockNeto) - quantity);
+    if (Number(inventory.stockNeto) < quantity) return { status: 409, data: { error: "Stock insuficiente para completar la transferencia" } };
+    inventory.stockNeto = Number(inventory.stockNeto) - quantity;
     let destination = database.inventarios.find((item) => item.sku === inventory.sku && item.sucursal === body.sucursalDestino);
     if (!destination) {
       destination = {

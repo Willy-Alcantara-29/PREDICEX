@@ -1,4 +1,4 @@
-﻿const { execFile } = require("node:child_process");
+const { execFile } = require("node:child_process");
 
 require("../load-env");
 
@@ -13,6 +13,7 @@ const configs = {
   clientes: { prefix: "cli", table: "dbo.clientes" },
   prestamos: { prefix: "pre", table: "dbo.prestamos" },
   pagos: { prefix: "pag", table: "dbo.pagos" },
+  sucursales: { prefix: "suc", table: "dbo.sucursales" },
 };
 
 function escapeSql(value) {
@@ -60,7 +61,7 @@ function selectFor(collectionName, where = "") {
     inventarios: `
       SELECT i.id, p.id AS productoId, p.sku, p.descripcion AS producto, s.nombre AS sucursal,
         i.stock_neto AS stockNeto, i.umbral_alerta AS umbralAlerta, i.precio_unitario AS precioUnitario,
-        CASE WHEN i.stock_neto <= 0 THEN 'Sin Stock' WHEN i.stock_neto <= i.umbral_alerta THEN 'Bajo Umbral' ELSE 'Disponible' END AS estado
+        CASE WHEN i.stock_neto <= i.umbral_alerta THEN 'Bajo stock' ELSE 'Disponible' END AS estado
       FROM dbo.inventarios i
       INNER JOIN dbo.productos p ON p.id = i.producto_id
       INNER JOIN dbo.sucursales s ON s.id = i.sucursal_id
@@ -72,6 +73,7 @@ function selectFor(collectionName, where = "") {
         p.balance_pendiente AS balancePendiente, p.estado, CONVERT(varchar(10), p.fecha, 23) AS fecha
       FROM dbo.prestamos p INNER JOIN dbo.clientes c ON c.id = p.cliente_id
       ${where} ORDER BY p.id FOR JSON PATH`,
+    sucursales: `SELECT id, nombre FROM dbo.sucursales ${where} ORDER BY nombre FOR JSON PATH`,
     pagos: `
       SELECT pa.id, pa.prestamo_id AS prestamoId, c.nombre AS cliente, pa.monto, pa.metodo, pa.referencia,
         CONVERT(varchar(10), pa.fecha, 23) AS fecha, pa.estado
@@ -125,7 +127,20 @@ async function create(collectionName, body) {
     if (collectionName === "productos") await runSql(`INSERT INTO dbo.productos (id, sku, codigo_barra, descripcion, categoria, precio, estado) VALUES ('${id}', ${sqlString(body.sku)}, ${sqlString(body.codigoBarra)}, ${sqlString(body.descripcion)}, ${sqlString(body.categoria || "Sin categoria")}, ${sqlNumber(body.precio)}, ${sqlString(body.estado || "Activo")});`);
     if (collectionName === "clientes") await runSql(`INSERT INTO dbo.clientes (id, nombre, documento, telefono, correo, direccion, estado) VALUES ('${id}', ${sqlString(body.nombre)}, ${sqlString(body.documento)}, ${sqlString(body.telefono)}, ${sqlString(body.correo)}, ${sqlString(body.direccion)}, ${sqlString(body.estado || "Activo")});`);
     if (collectionName === "prestamos") await runSql(`INSERT INTO dbo.prestamos (id, cliente_id, monto, tasa, plazo_meses, balance_pendiente, estado, fecha) VALUES ('${id}', ${sqlString(body.clienteId)}, ${sqlNumber(body.monto)}, ${sqlNumber(body.tasa)}, ${sqlNumber(body.plazoMeses)}, ${sqlNumber(body.balancePendiente || body.monto)}, ${sqlString(body.estado || "Activo")}, ${sqlString(body.fecha || new Date().toISOString().slice(0, 10))});`);
-    if (collectionName === "pagos") await runSql(`INSERT INTO dbo.pagos (id, prestamo_id, monto, metodo, referencia, fecha, estado) VALUES ('${id}', ${sqlString(body.prestamoId)}, ${sqlNumber(body.monto)}, ${sqlString(body.metodo)}, ${sqlString(body.referencia)}, ${sqlString(body.fecha || new Date().toISOString().slice(0, 10))}, ${sqlString(body.estado || "Aplicado")}); IF ${sqlString(body.estado || "Aplicado")} = N'Aplicado' UPDATE dbo.prestamos SET balance_pendiente = CASE WHEN balance_pendiente - ${sqlNumber(body.monto)} < 0 THEN 0 ELSE balance_pendiente - ${sqlNumber(body.monto)} END WHERE id = ${sqlString(body.prestamoId)};`);
+        if (collectionName === "pagos") await runSql(`
+BEGIN TRY
+  BEGIN TRANSACTION;
+  IF NOT EXISTS (SELECT 1 FROM dbo.prestamos WITH (UPDLOCK, HOLDLOCK) WHERE id = ${sqlString(body.prestamoId)}) THROW 52000, 'Prestamo no encontrado', 1;
+  IF ${sqlString(body.estado || "Aplicado")} = N'Aplicado' AND (SELECT balance_pendiente FROM dbo.prestamos WITH (UPDLOCK, HOLDLOCK) WHERE id = ${sqlString(body.prestamoId)}) < ${sqlNumber(body.monto)} THROW 52001, 'El pago no puede superar el balance pendiente', 1;
+  INSERT INTO dbo.pagos (id, prestamo_id, monto, metodo, referencia, fecha, estado) VALUES ('${id}', ${sqlString(body.prestamoId)}, ${sqlNumber(body.monto)}, ${sqlString(body.metodo)}, ${sqlString(body.referencia)}, ${sqlString(body.fecha || new Date().toISOString().slice(0, 10))}, ${sqlString(body.estado || "Aplicado")});
+  IF ${sqlString(body.estado || "Aplicado")} = N'Aplicado'
+    UPDATE dbo.prestamos SET balance_pendiente = balance_pendiente - ${sqlNumber(body.monto)}, estado = CASE WHEN balance_pendiente - ${sqlNumber(body.monto)} <= 0 THEN 'Cerrado' ELSE estado END WHERE id = ${sqlString(body.prestamoId)};
+  COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+  IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+  THROW;
+END CATCH;`);
     if (collectionName === "inventarios") {
       const productoId = await ensureProducto(body);
       const sucursalId = await ensureSucursal(body.sucursal);
@@ -148,6 +163,7 @@ async function update(collectionName, id, body) {
     if (collectionName === "clientes") await runSql(`UPDATE dbo.clientes SET nombre=${sqlString(next.nombre)}, documento=${sqlString(next.documento)}, telefono=${sqlString(next.telefono)}, correo=${sqlString(next.correo)}, direccion=${sqlString(next.direccion)}, estado=${sqlString(next.estado || "Activo")} WHERE id='${escapeSql(id)}';`);
     if (collectionName === "prestamos") await runSql(`UPDATE dbo.prestamos SET cliente_id=${sqlString(next.clienteId)}, monto=${sqlNumber(next.monto)}, tasa=${sqlNumber(next.tasa)}, plazo_meses=${sqlNumber(next.plazoMeses)}, balance_pendiente=${sqlNumber(next.balancePendiente)}, estado=${sqlString(next.estado || "Activo")}, fecha=${sqlString(next.fecha)} WHERE id='${escapeSql(id)}';`);
     if (collectionName === "pagos") await runSql(`UPDATE dbo.pagos SET prestamo_id=${sqlString(next.prestamoId)}, monto=${sqlNumber(next.monto)}, metodo=${sqlString(next.metodo)}, referencia=${sqlString(next.referencia)}, fecha=${sqlString(next.fecha)}, estado=${sqlString(next.estado || "Aplicado")} WHERE id='${escapeSql(id)}';`);
+    if (collectionName === "sucursales") await runSql(`UPDATE dbo.sucursales SET nombre=${sqlString(next.nombre)} WHERE id='${escapeSql(id)}';`);
     if (collectionName === "inventarios") {
       const productoId = await ensureProducto(next);
       const sucursalId = await ensureSucursal(next.sucursal);
@@ -163,24 +179,57 @@ async function update(collectionName, id, body) {
 async function remove(collectionName, id) {
   const current = await get(collectionName, id);
   if (!current) return { status: 404, data: { error: "Registro no encontrado" } };
+  if (["proveedores", "productos", "clientes", "prestamos", "pagos"].includes(collectionName)) {
+    const table = configs[collectionName].table;
+    const inactive = collectionName === "pagos" || collectionName === "prestamos" ? "Anulado" : "Inactivo";
+    await runSql(`UPDATE ${table} SET estado=${sqlString(inactive)} WHERE id='${escapeSql(id)}';`);
+    return { status: 200, data: { deactivated: await get(collectionName, id), reason: "Eliminacion logica para conservar integridad historica" } };
+  }
+  if (collectionName === "inventarios") {
+    const movementRows = await queryJson(`SELECT TOP 1 id FROM dbo.movimientos WHERE sku=${sqlString(current.sku)} FOR JSON PATH`);
+    if (movementRows.length) return { status: 409, data: { error: "El inventario tiene movimientos relacionados; no se puede eliminar fisicamente" } };
+  }
   await runSql(`DELETE FROM ${configs[collectionName].table} WHERE id='${escapeSql(id)}';`);
   return { status: 200, data: { deleted: current } };
 }
-
 async function registerMovement(body) {
   const inventory = await get("inventarios", body.inventarioId);
   if (!inventory) return { status: 404, data: { error: "Inventario no encontrado para el movimiento" } };
   const quantity = Number(body.cantidad || 0);
-  const nextStock = body.tipo === "Entrada" ? inventory.stockNeto + quantity : body.tipo === "Ajuste" ? quantity : Math.max(0, inventory.stockNeto - quantity);
-  await update("inventarios", inventory.id, { ...inventory, stockNeto: nextStock });
-  if (body.tipo === "Transferencia" && body.sucursalDestino) {
-    const destinationRows = await queryJson(selectFor("inventarios", `WHERE p.sku = ${sqlString(inventory.sku)} AND s.nombre = ${sqlString(body.sucursalDestino)}`));
-    if (destinationRows[0]) await update("inventarios", destinationRows[0].id, { ...destinationRows[0], stockNeto: Number(destinationRows[0].stockNeto) + quantity });
-    else await create("inventarios", { ...inventory, sucursal: body.sucursalDestino, stockNeto: quantity });
+  if (quantity <= 0) return { status: 400, data: { error: "Cantidad mayor que 0" } };
+  if (["Salida", "Transferencia"].includes(body.tipo) && Number(inventory.stockNeto || 0) < quantity) {
+    return { status: 409, data: { error: "Stock insuficiente para completar el movimiento" } };
   }
+  if (body.tipo === "Transferencia" && body.sucursalDestino === inventory.sucursal) {
+    return { status: 400, data: { error: "La sucursal destino debe ser diferente a la sucursal origen" } };
+  }
+
   const id = await nextId("mov", "dbo.movimientos");
-  await runSql(`INSERT INTO dbo.movimientos (id, tipo, sku, producto, sucursal_origen, sucursal_destino, cantidad, nota) VALUES ('${id}', ${sqlString(body.tipo)}, ${sqlString(inventory.sku)}, ${sqlString(inventory.producto)}, ${sqlString(body.tipo === "Entrada" ? "Proveedor" : inventory.sucursal)}, ${sqlString(body.tipo === "Transferencia" ? body.sucursalDestino : body.tipo === "Salida" ? "Cliente" : inventory.sucursal)}, ${sqlNumber(quantity)}, ${sqlString(body.nota)});`);
+  const destinationId = body.tipo === "Transferencia" ? await ensureSucursal(body.sucursalDestino) : null;
+  const productId = inventory.productoId || (await ensureProducto({ sku: inventory.sku, descripcion: inventory.producto, precio: inventory.precioUnitario }));
+  const destinationInventoryId = body.tipo === "Transferencia" ? await nextId("inv", "dbo.inventarios") : null;
+  const nextStockExpression = body.tipo === "Entrada" ? `stock_neto + ${sqlNumber(quantity)}` : body.tipo === "Ajuste" ? sqlNumber(quantity) : `stock_neto - ${sqlNumber(quantity)}`;
+  const destinationSql = body.tipo === "Transferencia" ? `
+IF EXISTS (SELECT 1 FROM dbo.inventarios WITH (UPDLOCK, HOLDLOCK) WHERE producto_id='${escapeSql(productId)}' AND sucursal_id='${escapeSql(destinationId)}')
+  UPDATE dbo.inventarios SET stock_neto = stock_neto + ${sqlNumber(quantity)}, actualizado_en = SYSDATETIME() WHERE producto_id='${escapeSql(productId)}' AND sucursal_id='${escapeSql(destinationId)}';
+ELSE
+  INSERT INTO dbo.inventarios (id, producto_id, sucursal_id, stock_neto, umbral_alerta, precio_unitario) VALUES ('${destinationInventoryId}', '${escapeSql(productId)}', '${escapeSql(destinationId)}', ${sqlNumber(quantity)}, ${sqlNumber(inventory.umbralAlerta, 10)}, ${sqlNumber(inventory.precioUnitario)});` : "";
+
+  await runSql(`
+BEGIN TRY
+  BEGIN TRANSACTION;
+  IF NOT EXISTS (SELECT 1 FROM dbo.inventarios WITH (UPDLOCK, HOLDLOCK) WHERE id='${escapeSql(inventory.id)}') THROW 51000, 'Inventario no encontrado', 1;
+  IF '${escapeSql(body.tipo)}' IN ('Salida', 'Transferencia') AND (SELECT stock_neto FROM dbo.inventarios WITH (UPDLOCK, HOLDLOCK) WHERE id='${escapeSql(inventory.id)}') < ${sqlNumber(quantity)} THROW 51001, 'Stock insuficiente', 1;
+  UPDATE dbo.inventarios SET stock_neto = ${nextStockExpression}, actualizado_en = SYSDATETIME() WHERE id='${escapeSql(inventory.id)}';
+  ${destinationSql}
+  INSERT INTO dbo.movimientos (id, tipo, sku, producto, sucursal_origen, sucursal_destino, cantidad, nota)
+  VALUES ('${id}', ${sqlString(body.tipo)}, ${sqlString(inventory.sku)}, ${sqlString(inventory.producto)}, ${sqlString(body.tipo === "Entrada" ? "Proveedor" : inventory.sucursal)}, ${sqlString(body.tipo === "Transferencia" ? body.sucursalDestino : body.tipo === "Salida" ? "Cliente" : inventory.sucursal)}, ${sqlNumber(quantity)}, ${sqlString(body.nota)});
+  COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+  IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+  THROW;
+END CATCH;`);
   return { status: 201, data: await get("movimientos", id) };
 }
-
 module.exports = { create, get, health, list, registerMovement, remove, runSql, update };
