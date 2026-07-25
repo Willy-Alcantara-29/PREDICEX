@@ -437,7 +437,7 @@ async function stockAlerts(options = {}) {
   return model.forecasts.filter((item) => ["critico", "alto", "medio"].includes(item.riesgo));
 }
 async function report(name, filters = {}) {
-  const collectionMap = { inventario: "inventarios", bajo_stock: "inventarios", movimientos: "movimientos", transferencias: "movimientos", productos: "productos", proveedores: "proveedores", clientes: "clientes", prestamos: "prestamos", balances: "prestamos", pagos: "pagos" };
+  const collectionMap = { inventario: "inventarios", bajo_stock: "inventarios", movimientos: "movimientos", transferencias: "movimientos", productos: "productos", proveedores: "proveedores", clientes: "clientes", prestamos: "prestamos", balances: "prestamos", pagos: "pagos", sucursales: "sucursales" };
   const collection = collectionMap[name];
   if (!collection) return { status: 404, data: { error: "Reporte no encontrado" } };
   const rows = await list(collection, filters);

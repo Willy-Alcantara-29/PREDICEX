@@ -1,4 +1,6 @@
-const API_URL = "http://localhost:3000";
+const API_URL = window.location.origin.startsWith("http")
+  ? window.location.origin
+  : "http://localhost:3000";
 
 const state = {
   proveedores: [],
@@ -8,6 +10,7 @@ const state = {
   clientes: [],
   prestamos: [],
   pagos: [],
+  sucursales: [],
   filters: {
     proveedores: { search: "", estado: "Todos", rnc: "Todos" },
     productos: { search: "", categoria: "Todas", estado: "Todos" },
@@ -15,8 +18,9 @@ const state = {
     clientes: { search: "", estado: "Todos" },
     prestamos: { search: "", estado: "Todos" },
     pagos: { search: "", estado: "Todos" },
+    sucursales: { search: "" },
   },
-  editing: { proveedores: null, productos: null, inventarios: null, clientes: null, prestamos: null, pagos: null },
+  editing: { proveedores: null, productos: null, inventarios: null, clientes: null, prestamos: null, pagos: null, sucursales: null },
 };
 
 
@@ -117,8 +121,75 @@ const titles = {
   clientsView: "Clientes",
   loansView: "Prestamos",
   paymentsView: "Pagos",
+  purchaseOrdersView: "Ordenes de compra",
+  branchesView: "Sucursales",
 };
 
+
+const collectionLabels = {
+  proveedores: "proveedor",
+  productos: "producto",
+  inventarios: "inventario",
+  clientes: "cliente",
+  prestamos: "prestamo",
+  pagos: "pago",
+  sucursales: "sucursal",
+};
+
+function friendlyErrorMessage(error, collectionName) {
+  const message = error?.message || "No se pudo completar la operacion";
+  if (collectionName === "productos" && /duplicado|existe|sku/i.test(message)) {
+    return "Ese SKU ya esta registrado. Usa otro SKU o edita el producto existente.";
+  }
+  if (/Registro duplicado/i.test(message)) {
+    const label = collectionLabels[collectionName] || "registro";
+    return `Ya existe un ${label} con esos datos. Revisa la informacion e intenta de nuevo.`;
+  }
+  return message;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+}
+
+function confirmAction({ title, message, confirmText = "Confirmar", cancelText = "Cancelar", danger = false }) {
+  return new Promise((resolve) => {
+    const existing = document.querySelector(".confirm-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = `
+      <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="confirm-icon ${danger ? "danger" : "info"}" aria-hidden="true"></div>
+        <div class="confirm-content">
+          <h3 id="confirmTitle">${escapeHtml(title)}</h3>
+          <p>${escapeHtml(message)}</p>
+        </div>
+        <div class="confirm-actions">
+          <button type="button" class="confirm-cancel">${escapeHtml(cancelText)}</button>
+          <button type="button" class="confirm-submit ${danger ? "danger" : ""}">${escapeHtml(confirmText)}</button>
+        </div>
+      </section>`;
+
+    const close = (value) => {
+      overlay.remove();
+      document.removeEventListener("keydown", onKeyDown);
+      resolve(value);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") close(false);
+    };
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay || event.target.closest(".confirm-cancel")) close(false);
+      if (event.target.closest(".confirm-submit")) close(true);
+    });
+    document.addEventListener("keydown", onKeyDown);
+    document.body.appendChild(overlay);
+    overlay.querySelector(".confirm-cancel")?.focus();
+  });
+}
 function setStatus(message, type = "info") {
   statusMessage.textContent = message;
   statusMessage.className = `status-note ${type}`;
@@ -164,6 +235,9 @@ function tagClass(status) {
 
 function validateForm(collectionName, data) {
   const errors = [];
+  if (collectionName === "sucursales") {
+    if (!data.nombre) errors.push("Nombre de sucursal obligatorio");
+  }
   if (collectionName === "productos") {
     if (!data.sku) errors.push("SKU obligatorio");
     if (!data.descripcion) errors.push("Descripcion obligatoria");
@@ -478,6 +552,9 @@ function renderAll() {
   renderClients();
   renderLoans();
   renderPayments();
+  renderOperationsModules();
+  renderPurchaseOrdersView();
+  renderBranchesView();
 }
 
 async function loadData() {
@@ -492,6 +569,7 @@ async function loadData() {
     state.clientes = clientes;
     state.prestamos = prestamos;
     state.pagos = pagos;
+    state.sucursales = sucursales;
     renderAll();
     setStatus(health.mode === "demo" ? "Modo demostración activo con datos simulados." : "Datos sincronizados con SQL Server.", "ok");
   } catch (error) {
@@ -533,21 +611,22 @@ async function saveMovement(form) {
 }
 
 async function deleteRecord(collectionName, id) {
-  const messages = {
-    productos: "Este producto puede tener inventario relacionado. Confirma que deseas eliminarlo.",
-    inventarios: "Este inventario puede tener movimientos relacionados. Confirma que deseas eliminarlo.",
-    proveedores: "Confirma que deseas eliminar este proveedor.",
-    clientes: "Este cliente puede tener prestamos relacionados. Confirma que deseas eliminarlo.",
-    prestamos: "Este prestamo puede tener pagos relacionados. Confirma que deseas eliminarlo.",
-    pagos: "Confirma que deseas eliminar este pago.",
-  };
-  if (!window.confirm(messages[collectionName] || "Confirma la eliminacion.")) return;
+  const record = state[collectionName]?.find((item) => item.id === id) || {};
+  const name = record.razonSocial || record.descripcion || record.producto || record.nombre || record.referencia || record.id || id;
+  const label = collectionLabels[collectionName] || "registro";
+  const confirmed = await confirmAction({
+    title: `Eliminar ${label}`,
+    message: `Se aplicara la eliminacion de "${name}". Si tiene historial relacionado, quedara inactivo para conservar la auditoria.`,
+    confirmText: "Eliminar",
+    danger: true,
+  });
+  if (!confirmed) return;
   try {
     await apiRequest(`/${collectionName}/${id}`, { method: "DELETE" });
     await loadData();
-    setStatus("Registro eliminado correctamente.", "ok");
+    setStatus(`${label} eliminado correctamente.`, "ok");
   } catch (error) {
-    setStatus(error.message, "error");
+    setStatus(friendlyErrorMessage(error, collectionName), "error");
   }
 }
 
@@ -715,6 +794,7 @@ state.pagination = {
   clientes: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
   prestamos: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
   pagos: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+  sucursales: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
 };
 state.auth = { token: sessionStorage.getItem("predicexToken") || "", user: JSON.parse(sessionStorage.getItem("predicexUser") || "null") };
 
@@ -779,8 +859,8 @@ async function loadPaged(collectionName) {
 
 loadData = async function() {
   try {
-    const [health, metrics, proveedores, productos, inventarios, movimientos, clientes, prestamos, pagos] = await Promise.all([
-      apiRequest("/health"), apiRequest("/metrics"), loadPaged("proveedores"), loadPaged("productos"), loadPaged("inventarios"), loadPaged("movimientos"), loadPaged("clientes"), loadPaged("prestamos"), loadPaged("pagos"),
+    const [health, metrics, proveedores, productos, inventarios, movimientos, clientes, prestamos, pagos, sucursales] = await Promise.all([
+      apiRequest("/health"), apiRequest("/metrics"), loadPaged("proveedores"), loadPaged("productos"), loadPaged("inventarios"), loadPaged("movimientos"), loadPaged("clientes"), loadPaged("prestamos"), loadPaged("pagos"), loadPaged("sucursales"),
     ]);
     if (health.mode === "demo") throw new Error("SQL Server no esta conectado. No se muestran datos simulados en modo produccion.");
     state.metrics = metrics;
@@ -791,6 +871,7 @@ loadData = async function() {
     state.clientes = clientes;
     state.prestamos = prestamos;
     state.pagos = pagos;
+    state.sucursales = sucursales;
     renderAll();
     renderPaginationAll();
     setStatus(`Datos sincronizados con SQL Server. Ultima sincronizacion: ${formatDateTime(metrics.syncedAt)}`, "ok");
@@ -912,6 +993,7 @@ function renderPaginationAll() {
   renderPagination("clientes", clientTable);
   renderPagination("prestamos", loanTable);
   renderPagination("pagos", paymentTable);
+  renderPagination("sucursales", document.querySelector("#branchesTableBody"));
 }
 
 saveRecord = async function(collectionName, form) {
@@ -923,8 +1005,9 @@ saveRecord = async function(collectionName, form) {
     await apiRequest(id ? `/${collectionName}/${id}` : `/${collectionName}`, { method: id ? "PUT" : "POST", body: JSON.stringify(data) });
     clearForm(form, collectionName);
     await loadData();
-    setStatus(id ? "Registro actualizado correctamente." : "Registro creado correctamente.", "ok");
-  }).catch((error) => setStatus(error.message, "error"));
+    const label = collectionLabels[collectionName] || "registro";
+    setStatus(id ? `${label} actualizado correctamente.` : `${label} creado correctamente.`, "ok");
+  }).catch((error) => setStatus(friendlyErrorMessage(error, collectionName), "error"));
 };
 
 saveMovement = async function(form) {
@@ -942,19 +1025,26 @@ saveMovement = async function(form) {
 deleteRecord = async function(collectionName, id) {
   const record = state[collectionName].find((item) => item.id === id) || {};
   const name = record.razonSocial || record.descripcion || record.producto || record.nombre || record.referencia || record.id || id;
-  if (!window.confirm(`Confirma la eliminacion de ${name}. Si tiene historico relacionado se desactivara para conservar auditoria e integridad.`)) return;
+  const label = collectionLabels[collectionName] || "registro";
+  const confirmed = await confirmAction({
+    title: `Eliminar ${label}`,
+    message: `Se aplicara la eliminacion de "${name}". Si tiene historial relacionado, quedara inactivo para conservar la auditoria.`,
+    confirmText: "Eliminar",
+    danger: true,
+  });
+  if (!confirmed) return;
   try {
     await apiRequest(`/${collectionName}/${id}`, { method: "DELETE" });
     await loadData();
-    setStatus("Operacion aplicada correctamente.", "ok");
+    setStatus(`${label} eliminado correctamente.`, "ok");
   } catch (error) {
-    setStatus(error.message, "error");
+    setStatus(friendlyErrorMessage(error, collectionName), "error");
   }
 };
 
 exportRows = async function(collectionName) {
   try {
-    const reportName = { inventarios: "inventario", productos: "productos", proveedores: "proveedores", clientes: "clientes", prestamos: "prestamos", pagos: "pagos", movimientos: "movimientos" }[collectionName] || collectionName;
+    const reportName = { inventarios: "inventario", productos: "productos", proveedores: "proveedores", clientes: "clientes", prestamos: "prestamos", pagos: "pagos", movimientos: "movimientos", sucursales: "sucursales" }[collectionName] || collectionName;
     const report = await apiRequest(`/reportes/${reportName}?${queryFor(collectionName)}`);
     if (!report.items.length) return setStatus("No hay datos para exportar.", "error");
     const headers = Object.keys(report.items[0]);
@@ -1126,6 +1216,218 @@ function filteredStockAlerts() {
   });
 }
 
+function ensureMovementsView() {
+  const workspace = document.querySelector(".workspace");
+  if (!workspace || document.querySelector("#movementsView")) return;
+  workspace.insertAdjacentHTML("beforeend", `
+    <section id="movementsView" class="view">
+      <article class="panel products-panel movement-module-panel">
+        <div class="panel-heading products-heading">
+          <div>
+            <p class="eyebrow">Operaciones</p>
+            <h3>Movimientos</h3>
+            <span>Entradas, salidas, transferencias y ajustes registrados</span>
+          </div>
+        </div>
+        <div class="predictive-kpis movement-kpis">
+          <article><span>Total</span><strong id="movementTotalKpi">0</strong></article>
+          <article><span>Entradas</span><strong id="movementEntryKpi">0</strong></article>
+          <article><span>Salidas</span><strong id="movementOutputKpi">0</strong></article>
+          <article><span>Ajustes</span><strong id="movementAdjustKpi">0</strong></article>
+        </div>
+        <div class="table-wrap movement-table-wrap">
+          <table>
+            <thead><tr><th>Tipo</th><th>SKU</th><th>Producto</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Fecha</th><th>Nota</th></tr></thead>
+            <tbody id="movementsTableBody"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>`);
+}
+
+function ensureTransfersView() {
+  const workspace = document.querySelector(".workspace");
+  if (!workspace || document.querySelector("#transfersView")) return;
+  workspace.insertAdjacentHTML("beforeend", `
+    <section id="transfersView" class="view">
+      <article class="panel products-panel movement-module-panel">
+        <div class="panel-heading products-heading">
+          <div>
+            <p class="eyebrow">Operaciones</p>
+            <h3>Transferencias</h3>
+            <span>Movimientos entre sucursales registrados en inventario</span>
+          </div>
+        </div>
+        <div class="predictive-kpis movement-kpis">
+          <article><span>Total transferencias</span><strong id="transferTotalKpi">0</strong></article>
+          <article><span>Unidades movidas</span><strong id="transferUnitsKpi">0</strong></article>
+          <article><span>Origenes</span><strong id="transferOriginKpi">0</strong></article>
+          <article><span>Destinos</span><strong id="transferDestinationKpi">0</strong></article>
+        </div>
+        <div class="table-wrap movement-table-wrap">
+          <table>
+            <thead><tr><th>SKU</th><th>Producto</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Fecha</th><th>Nota</th></tr></thead>
+            <tbody id="transfersTableBody"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>`);
+}
+
+function movementTypeClass(type) {
+  if (type === "Entrada") return "ok";
+  if (type === "Salida") return "empty";
+  if (type === "Transferencia") return "info";
+  return "low";
+}
+
+function renderOperationsModules() {
+  ensureMovementsView();
+  ensureTransfersView();
+  const movements = state.movimientos || [];
+  const transfers = movements.filter((item) => item.tipo === "Transferencia");
+  const countByType = movements.reduce((acc, item) => {
+    acc[item.tipo] = (acc[item.tipo] || 0) + 1;
+    return acc;
+  }, {});
+  document.querySelector("#movementTotalKpi") && (document.querySelector("#movementTotalKpi").textContent = movements.length.toLocaleString("es-DO"));
+  document.querySelector("#movementEntryKpi") && (document.querySelector("#movementEntryKpi").textContent = Number(countByType.Entrada || 0).toLocaleString("es-DO"));
+  document.querySelector("#movementOutputKpi") && (document.querySelector("#movementOutputKpi").textContent = Number(countByType.Salida || 0).toLocaleString("es-DO"));
+  document.querySelector("#movementAdjustKpi") && (document.querySelector("#movementAdjustKpi").textContent = Number(countByType.Ajuste || 0).toLocaleString("es-DO"));
+  document.querySelector("#transferTotalKpi") && (document.querySelector("#transferTotalKpi").textContent = transfers.length.toLocaleString("es-DO"));
+  document.querySelector("#transferUnitsKpi") && (document.querySelector("#transferUnitsKpi").textContent = transfers.reduce((sum, item) => sum + Number(item.cantidad || 0), 0).toLocaleString("es-DO"));
+  document.querySelector("#transferOriginKpi") && (document.querySelector("#transferOriginKpi").textContent = new Set(transfers.map((item) => item.sucursalOrigen).filter(Boolean)).size.toLocaleString("es-DO"));
+  document.querySelector("#transferDestinationKpi") && (document.querySelector("#transferDestinationKpi").textContent = new Set(transfers.map((item) => item.sucursalDestino).filter(Boolean)).size.toLocaleString("es-DO"));
+
+  const movementsBody = document.querySelector("#movementsTableBody");
+  if (movementsBody) {
+    movementsBody.innerHTML = movements.length
+      ? movements.map((item) => `<tr><td><span class="tag ${movementTypeClass(item.tipo)}">${item.tipo || "-"}</span></td><td>${item.sku || "-"}</td><td>${item.producto || "-"}</td><td>${item.sucursalOrigen || "-"}</td><td>${item.sucursalDestino || "-"}</td><td>${Number(item.cantidad || 0).toLocaleString("es-DO")}</td><td>${formatDateTime(item.creadoEn || item.fecha)}</td><td>${item.nota || "-"}</td></tr>`).join("")
+      : `<tr><td colspan="8" class="empty-table-cell">Sin movimientos registrados.</td></tr>`;
+  }
+  const transfersBody = document.querySelector("#transfersTableBody");
+  if (transfersBody) {
+    transfersBody.innerHTML = transfers.length
+      ? transfers.map((item) => `<tr><td>${item.sku || "-"}</td><td>${item.producto || "-"}</td><td>${item.sucursalOrigen || "-"}</td><td>${item.sucursalDestino || "-"}</td><td>${Number(item.cantidad || 0).toLocaleString("es-DO")}</td><td>${formatDateTime(item.creadoEn || item.fecha)}</td><td>${item.nota || "-"}</td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty-table-cell">Sin transferencias registradas.</td></tr>`;
+  }
+}
+function purchaseOrderSuggestions() {
+  return (state.inventarios || [])
+    .filter((item) => Number(item.stockNeto || 0) <= Number(item.umbralAlerta || 0))
+    .map((item, index) => {
+      const deficit = Math.max(Number(item.umbralAlerta || 0) - Number(item.stockNeto || 0), 0);
+      const suggested = Math.max(deficit + Number(item.umbralAlerta || 0), 1);
+      const product = (state.productos || []).find((prod) => prod.sku === item.sku) || {};
+      const supplier = (state.proveedores || [])[index % Math.max((state.proveedores || []).length, 1)] || {};
+      return {
+        id: `oc-${item.id || index}`,
+        sku: item.sku,
+        producto: item.producto,
+        sucursal: item.sucursal,
+        proveedor: supplier.razonSocial || "Proveedor por asignar",
+        cantidad: suggested,
+        costo: suggested * Number(item.precioUnitario || product.precio || 0),
+        estado: Number(item.stockNeto || 0) <= 0 ? "Critica" : "Pendiente",
+        prioridad: Number(item.stockNeto || 0) <= 0 ? "Alta" : "Media",
+      };
+    });
+}
+
+function ensurePurchaseOrdersView() {
+  const workspace = document.querySelector(".workspace");
+  if (!workspace || document.querySelector("#purchaseOrdersView")) return;
+  workspace.insertAdjacentHTML("beforeend", `
+    <section id="purchaseOrdersView" class="view">
+      <article class="panel products-panel movement-module-panel">
+        <div class="panel-heading products-heading">
+          <div><p class="eyebrow">Abastecimiento</p><h3>Ordenes de compra</h3><span>Ordenes sugeridas por stock bajo y reposicion</span></div>
+          <button type="button" id="refreshPurchaseOrdersButton" class="small-button">Actualizar</button>
+        </div>
+        <div class="predictive-kpis movement-kpis">
+          <article><span>Ordenes sugeridas</span><strong id="purchaseOrderTotalKpi">0</strong></article>
+          <article><span>Unidades a comprar</span><strong id="purchaseOrderUnitsKpi">0</strong></article>
+          <article><span>Costo estimado</span><strong id="purchaseOrderCostKpi">RD$ 0</strong></article>
+          <article><span>Prioridad alta</span><strong id="purchaseOrderHighKpi">0</strong></article>
+        </div>
+        <div class="table-wrap movement-table-wrap">
+          <table>
+            <thead><tr><th>Orden</th><th>SKU</th><th>Producto</th><th>Sucursal destino</th><th>Proveedor</th><th>Cantidad</th><th>Costo estimado</th><th>Prioridad</th><th>Estado</th><th>Accion</th></tr></thead>
+            <tbody id="purchaseOrdersTableBody"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>`);
+  document.querySelector("#refreshPurchaseOrdersButton")?.addEventListener("click", () => {
+    renderPurchaseOrdersView();
+    setStatus("Ordenes de compra actualizadas segun inventario actual.", "ok");
+  });
+}
+
+function renderPurchaseOrdersView() {
+  ensurePurchaseOrdersView();
+  const orders = purchaseOrderSuggestions();
+  document.querySelector("#purchaseOrderTotalKpi") && (document.querySelector("#purchaseOrderTotalKpi").textContent = orders.length.toLocaleString("es-DO"));
+  document.querySelector("#purchaseOrderUnitsKpi") && (document.querySelector("#purchaseOrderUnitsKpi").textContent = orders.reduce((sum, item) => sum + Number(item.cantidad || 0), 0).toLocaleString("es-DO"));
+  document.querySelector("#purchaseOrderCostKpi") && (document.querySelector("#purchaseOrderCostKpi").textContent = formatMoney(orders.reduce((sum, item) => sum + Number(item.costo || 0), 0)));
+  document.querySelector("#purchaseOrderHighKpi") && (document.querySelector("#purchaseOrderHighKpi").textContent = orders.filter((item) => item.prioridad === "Alta").length.toLocaleString("es-DO"));
+  const body = document.querySelector("#purchaseOrdersTableBody");
+  if (!body) return;
+  body.innerHTML = orders.length
+    ? orders.map((item) => `<tr><td>${item.id}</td><td>${item.sku}</td><td>${item.producto}</td><td>${item.sucursal}</td><td>${item.proveedor}</td><td>${Number(item.cantidad || 0).toLocaleString("es-DO")}</td><td>${formatMoney(item.costo)}</td><td><span class="tag ${item.prioridad === "Alta" ? "empty" : "low"}">${item.prioridad}</span></td><td><span class="tag ${item.estado === "Critica" ? "empty" : "low"}">${item.estado}</span></td><td class="table-actions"><button type="button" data-action="mark-purchase-order" data-id="${item.id}">Marcar revisada</button></td></tr>`).join("")
+    : `<tr><td colspan="10" class="empty-table-cell">No hay productos bajo minimo para ordenar.</td></tr>`;
+}
+
+function ensureBranchesView() {
+  const workspace = document.querySelector(".workspace");
+  if (!workspace || document.querySelector("#branchesView")) return;
+  workspace.insertAdjacentHTML("beforeend", `
+    <section id="branchesView" class="view">
+      <article class="panel products-panel movement-module-panel">
+        <div class="panel-heading products-heading"><div><p class="eyebrow">Red operacional</p><h3>Sucursales</h3><span>Registro y control de sucursales activas</span></div></div>
+        <div class="product-kpis">
+          <article><span class="inventory-kpi-icon branch"></span><div><strong id="branchTotalKpi">0</strong><span>Total sucursales</span></div></article>
+          <article><span class="product-kpi-icon total"></span><div><strong id="branchWithStockKpi">0</strong><span>Con inventario</span></div></article>
+          <article><span class="product-kpi-icon low"></span><div><strong id="branchLowStockKpi">0</strong><span>Con bajo stock</span></div></article>
+          <article><span class="product-kpi-icon best"></span><div><strong id="branchStockUnitsKpi">0</strong><span>Unidades totales</span></div></article>
+        </div>
+        <div class="form-helper-note">Crea una sucursal nueva o edita el nombre de una existente.</div>
+        <form id="branchForm" class="crud-form"><label>Nombre de sucursal<span class="field-shell branch-field"><input name="nombre" placeholder="Sucursal Norte" required /></span></label><button type="submit" class="small-button" data-default-text="Guardar sucursal">Guardar sucursal</button></form>
+        <div class="product-tools module-tools"><label class="search-control"><span>Buscar sucursal</span><input data-search="sucursales" type="search" placeholder="Buscar por nombre" /></label><button type="button" class="export-button" data-export="sucursales">Exportar Excel</button></div>
+        <div class="table-wrap movement-table-wrap"><table><thead><tr><th>Sucursal</th><th>Productos</th><th>Stock total</th><th>Bajo stock</th><th>Acciones</th></tr></thead><tbody id="branchesTableBody"></tbody></table></div>
+      </article>
+    </section>`);
+  document.querySelector("#branchForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveRecord("sucursales", event.currentTarget);
+  });
+}
+
+function filteredBranches() {
+  const filter = state.filters.sucursales || { search: "" };
+  return (state.sucursales || []).filter((item) => !filter.search || normalize(item.nombre).includes(normalize(filter.search)));
+}
+
+function renderBranchesView() {
+  ensureBranchesView();
+  const rows = filteredBranches();
+  const inventory = state.inventarios || [];
+  const totalStock = inventory.reduce((sum, item) => sum + Number(item.stockNeto || 0), 0);
+  const withStock = new Set(inventory.map((item) => item.sucursal).filter(Boolean));
+  const lowBranches = new Set(inventory.filter((item) => Number(item.stockNeto || 0) <= Number(item.umbralAlerta || 0)).map((item) => item.sucursal).filter(Boolean));
+  document.querySelector("#branchTotalKpi") && (document.querySelector("#branchTotalKpi").textContent = (state.sucursales || []).length.toLocaleString("es-DO"));
+  document.querySelector("#branchWithStockKpi") && (document.querySelector("#branchWithStockKpi").textContent = withStock.size.toLocaleString("es-DO"));
+  document.querySelector("#branchLowStockKpi") && (document.querySelector("#branchLowStockKpi").textContent = lowBranches.size.toLocaleString("es-DO"));
+  document.querySelector("#branchStockUnitsKpi") && (document.querySelector("#branchStockUnitsKpi").textContent = totalStock.toLocaleString("es-DO"));
+  const body = document.querySelector("#branchesTableBody");
+  if (!body) return;
+  body.innerHTML = rows.length ? rows.map((branch) => {
+    const items = inventory.filter((item) => item.sucursal === branch.nombre);
+    const stock = items.reduce((sum, item) => sum + Number(item.stockNeto || 0), 0);
+    const low = items.filter((item) => Number(item.stockNeto || 0) <= Number(item.umbralAlerta || 0)).length;
+    return `<tr><td><span class="row-icon branch-icon"></span>${branch.nombre}</td><td>${items.length.toLocaleString("es-DO")}</td><td>${stock.toLocaleString("es-DO")}</td><td><span class="tag ${low ? "low" : "ok"}">${low.toLocaleString("es-DO")}</span></td><td class="table-actions"><button type="button" data-action="edit-branch" data-id="${branch.id}">Editar</button><button type="button" data-action="delete-branch" data-id="${branch.id}" data-record-name="${branch.nombre}">Eliminar</button></td></tr>`;
+  }).join("") : `<tr><td colspan="5" class="empty-table-cell">Sin sucursales registradas.</td></tr>`;
+}
 function ensureAlertsView() {
   const workspace = document.querySelector(".workspace");
   if (!workspace || document.querySelector("#alertsView")) return;
@@ -1781,7 +2083,12 @@ async function loadBackupsData() {
 }
 
 async function createManualBackup() {
-  if (!window.confirm("Se creara un respaldo manual de SQL Server y se validara con RESTORE VERIFYONLY. Esta accion puede tardar varios minutos.")) return;
+  const confirmed = await confirmAction({
+    title: "Crear respaldo",
+    message: "Se creara un respaldo manual de SQL Server y se validara antes de registrarlo. Esta accion puede tardar varios minutos.",
+    confirmText: "Crear respaldo",
+  });
+  if (!confirmed) return;
   try {
     await apiRequest("/backups", { method: "POST", body: JSON.stringify({}) });
     await loadBackupsData();
@@ -1923,7 +2230,7 @@ function createPlaceholderView(id, label) {
         <div class="module-placeholder">
           ${menuIcon("settings")}
           <strong>${label}</strong>
-          <span>Modulo en preparación</span>
+          <span>En preparación</span>
         </div>
       </article>
     </section>`);
@@ -1937,7 +2244,11 @@ function ensureModuleViews() {
   ensureSettingsView();
   ensureBackupsView();
   ensureHelpView();
-  menuSections.flatMap((section) => section.items).filter((item) => !["alertsView", "reportsView", "auditView", "usersRolesView", "settingsView", "backupsView", "helpView"].includes(item.id)).forEach((item) => createPlaceholderView(item.id, item.label));
+  ensureMovementsView();
+  ensureTransfersView();
+  ensurePurchaseOrdersView();
+  ensureBranchesView();
+  menuSections.flatMap((section) => section.items).filter((item) => !["purchaseOrdersView", "branchesView", "movementsView", "transfersView", "alertsView", "reportsView", "auditView", "usersRolesView", "settingsView", "backupsView", "helpView"].includes(item.id)).forEach((item) => createPlaceholderView(item.id, item.label));
 }
 
 
@@ -2063,3 +2374,25 @@ showApp = function() {
 
 
 
+
+document.addEventListener("click", async (event) => {
+  const target = event.target.closest("button");
+  if (!target) return;
+  const { action, id } = target.dataset;
+  if (action === "edit-branch") fillForm(document.querySelector("#branchForm"), state.sucursales.find((item) => item.id === id), "sucursales");
+  if (action === "delete-branch") await deleteRecord("sucursales", id);
+  if (action === "mark-purchase-order") setStatus(`Orden ${id} marcada como revisada.`, "ok");
+});
+document.addEventListener("input", (event) => {
+  const input = event.target.closest("[data-search]");
+  if (!input || input._predicexDelegatedSearch) return;
+  const collectionName = input.dataset.search;
+  if (!state.filters[collectionName]) return;
+  state.filters[collectionName].search = input.value;
+  if (state.pagination[collectionName]) state.pagination[collectionName].page = 1;
+  clearTimeout(input._predicexSearchTimer);
+  input._predicexSearchTimer = setTimeout(() => {
+    if (collectionName === "sucursales") renderBranchesView();
+    else loadData();
+  }, 250);
+}, true);
