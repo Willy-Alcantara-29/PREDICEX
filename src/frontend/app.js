@@ -345,13 +345,16 @@ function renderInventory() {
   const rows = filteredInventory();
   inventoryTable.innerHTML = rows.map((item) => {
     const status = item.estado || statusForInventory(item);
+    const stock = Number(item.stockNeto || 0);
+    const unitPrice = Number(item.precioUnitario || 0);
     return `
       <tr>
         <td><span class="row-icon sku-icon"></span>${item.sku}</td>
         <td><span class="row-icon product-icon"></span>${item.producto}</td>
         <td><span class="row-icon branch-icon"></span>${item.sucursal}</td>
-        <td><strong>${Number(item.stockNeto || 0).toLocaleString("es-DO")}</strong></td>
-        <td>${money(item.precioUnitario)}</td>
+        <td><strong>${stock.toLocaleString("es-DO")}</strong></td>
+        <td>${money(unitPrice)}</td>
+        <td>${money(stock * unitPrice)}</td>
         <td><span class="tag ${tagClass(status)}">${status}</span></td>
         <td>${new Date().toLocaleDateString("es-DO")} ${new Date().toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" })}</td>
         <td class="table-actions">
@@ -379,6 +382,7 @@ function renderSuppliers() {
       <td>${new Date().toLocaleDateString("es-DO")}</td>
       <td class="table-actions">
         <button type="button" data-action="edit-supplier" data-id="${supplier.id}">Editar</button>
+        <button type="button" data-action="toggle-supplier-status" data-next-status="${(supplier.estado || "Activo") === "Activo" ? "Inactivo" : "Activo"}" data-id="${supplier.id}">${(supplier.estado || "Activo") === "Activo" ? "Desactivar" : "Activar"}</button>
         <button type="button" data-action="delete-supplier" data-id="${supplier.id}">Eliminar</button>
       </td>
     </tr>`).join("");
@@ -392,19 +396,25 @@ function renderProducts() {
   document.querySelector("#categoryTotalKpi").textContent = categories.size;
   document.querySelector("#productLowStockKpi").textContent = lowStockProductIds.size;
   document.querySelector("#bestProductKpi").textContent = state.movimientos[0]?.sku || state.productos[0]?.sku || "--";
-  productTable.innerHTML = rows.map((product) => `
+  productTable.innerHTML = rows.map((product) => {
+    const stock = state.inventarios.reduce((sum, item) => item.productoId === product.id || item.sku === product.sku ? sum + Number(item.stockNeto || 0) : sum, 0);
+    const unitPrice = Number(product.precio || 0);
+    return `
     <tr>
       <td><span class="row-icon product-sku-icon"></span>${product.sku}</td>
       <td><span class="row-icon product-row-icon"></span>${product.descripcion}</td>
       <td>${product.codigoBarra || "-"}</td>
       <td><span class="tag product-category-tag">${product.categoria || "Sin categoria"}</span></td>
-      <td>${money(product.precio)}</td>
+      <td>${money(unitPrice)}</td>
+      <td>${money(stock * unitPrice)}</td>
       <td><span class="tag ${tagClass(product.estado || "Activo")}">${product.estado || "Activo"}</span></td>
       <td class="table-actions">
         <button type="button" data-action="edit-product" data-id="${product.id}">Editar</button>
+        <button type="button" data-action="toggle-product-status" data-next-status="${(product.estado || "Activo") === "Activo" ? "Inactivo" : "Activo"}" data-id="${product.id}">${(product.estado || "Activo") === "Activo" ? "Desactivar" : "Activar"}</button>
         <button type="button" data-action="delete-product" data-id="${product.id}">Eliminar</button>
       </td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
 }
 
 function renderMovements() {
@@ -514,7 +524,7 @@ function renderClients() {
   document.querySelector("#clientLoanKpi").textContent = clientsWithLoans.size;
   document.querySelector("#clientInactiveKpi").textContent = state.clientes.filter((item) => item.estado === "Inactivo").length;
   clientTable.innerHTML = rows.map((client) => `
-    <tr><td>${client.nombre}</td><td>${client.documento}</td><td>${client.telefono || "-"}</td><td>${client.correo || "-"}</td><td>${client.direccion || "-"}</td><td><span class="tag ${tagClass(client.estado)}">${client.estado || "Activo"}</span></td><td class="table-actions"><button type="button" data-action="edit-client" data-id="${client.id}">Editar</button><button type="button" data-action="delete-client" data-id="${client.id}">Eliminar</button></td></tr>`).join("");
+    <tr><td>${client.nombre}</td><td>${client.documento}</td><td>${client.telefono || "-"}</td><td>${client.correo || "-"}</td><td>${client.direccion || "-"}</td><td><span class="tag ${tagClass(client.estado)}">${client.estado || "Activo"}</span></td><td class="table-actions"><button type="button" data-action="edit-client" data-id="${client.id}">Editar</button><button type="button" data-action="toggle-client-status" data-next-status="${(client.estado || "Activo") === "Activo" ? "Inactivo" : "Activo"}" data-id="${client.id}">${(client.estado || "Activo") === "Activo" ? "Desactivar" : "Activar"}</button><button type="button" data-action="delete-client" data-id="${client.id}">Eliminar</button></td></tr>`).join("");
   renderClientOptions();
 }
 
@@ -528,7 +538,7 @@ function renderLoans() {
   document.querySelector("#loanAmountKpi").textContent = money(totalAmount);
   document.querySelector("#loanBalanceKpi").textContent = money(totalBalance);
   loanTable.innerHTML = rows.map((loan) => `
-    <tr><td>${loan.cliente}</td><td>${money(loan.monto)}</td><td>${Number(loan.tasa || 0)}%</td><td>${loan.plazoMeses} meses</td><td>${money(loan.balancePendiente)}</td><td><span class="tag ${tagClass(loan.estado)}">${loan.estado}</span></td><td>${loan.fecha || "-"}</td><td class="table-actions"><button type="button" data-action="edit-loan" data-id="${loan.id}">Editar</button><button type="button" data-action="delete-loan" data-id="${loan.id}">Eliminar</button></td></tr>`).join("");
+    <tr><td>${loan.cliente}</td><td>${money(loan.monto)}</td><td>${Number(loan.tasa || 0)}%</td><td>${loan.plazoMeses} meses</td><td>${money(loan.balancePendiente)}</td><td><span class="tag ${tagClass(loan.estado)}">${loan.estado}</span></td><td>${loan.fecha || "-"}</td><td class="table-actions"><button type="button" data-action="edit-loan" data-id="${loan.id}">Editar</button><button type="button" data-action="toggle-loan-status" data-next-status="${loan.estado === "Activo" ? "Anulado" : "Activo"}" data-id="${loan.id}">${loan.estado === "Activo" ? "Anular" : "Activar"}</button><button type="button" data-action="delete-loan" data-id="${loan.id}">Eliminar</button></td></tr>`).join("");
   renderClientOptions();
 }
 
@@ -608,6 +618,58 @@ async function saveMovement(form) {
     await loadData();
     setStatus("Movimiento registrado correctamente.", "ok");
   }).catch((error) => setStatus(error.message, "error"));
+}
+
+async function toggleSupplierStatus(id) {
+  const supplier = state.proveedores.find((item) => item.id === id);
+  if (!supplier) return setStatus("Proveedor no encontrado.", "error");
+  const nextStatus = (supplier.estado || "Activo") === "Activo" ? "Inactivo" : "Activo";
+  try {
+    await apiRequest(`/proveedores/${id}`, { method: "PUT", body: JSON.stringify({ ...supplier, estado: nextStatus }) });
+    await loadData();
+    setStatus(`Proveedor ${nextStatus === "Activo" ? "activado" : "desactivado"} correctamente.`, "ok");
+  } catch (error) {
+    setStatus(typeof friendlyErrorMessage === "function" ? friendlyErrorMessage(error, "proveedores") : error.message, "error");
+  }
+}
+
+async function toggleProductStatus(id) {
+  const product = state.productos.find((item) => item.id === id);
+  if (!product) return setStatus("Producto no encontrado.", "error");
+  const nextStatus = (product.estado || "Activo") === "Activo" ? "Inactivo" : "Activo";
+  try {
+    await apiRequest(`/productos/${id}`, { method: "PUT", body: JSON.stringify({ ...product, estado: nextStatus }) });
+    await loadData();
+    setStatus(`Producto ${nextStatus === "Activo" ? "activado" : "desactivado"} correctamente.`, "ok");
+  } catch (error) {
+    setStatus(typeof friendlyErrorMessage === "function" ? friendlyErrorMessage(error, "productos") : error.message, "error");
+  }
+}
+
+async function toggleLoanStatus(id) {
+  const loan = state.prestamos.find((item) => item.id === id);
+  if (!loan) return setStatus("Prestamo no encontrado.", "error");
+  const nextStatus = loan.estado === "Activo" ? "Anulado" : "Activo";
+  try {
+    await apiRequest(`/prestamos/${id}`, { method: "PUT", body: JSON.stringify({ ...loan, estado: nextStatus }) });
+    await loadData();
+    setStatus(`Prestamo ${nextStatus === "Activo" ? "activado" : "anulado"} correctamente.`, "ok");
+  } catch (error) {
+    setStatus(typeof friendlyErrorMessage === "function" ? friendlyErrorMessage(error, "prestamos") : error.message, "error");
+  }
+}
+
+async function toggleClientStatus(id) {
+  const client = state.clientes.find((item) => item.id === id);
+  if (!client) return setStatus("Cliente no encontrado.", "error");
+  const nextStatus = (client.estado || "Activo") === "Activo" ? "Inactivo" : "Activo";
+  try {
+    await apiRequest(`/clientes/${id}`, { method: "PUT", body: JSON.stringify({ ...client, estado: nextStatus }) });
+    await loadData();
+    setStatus(`Cliente ${nextStatus === "Activo" ? "activado" : "desactivado"} correctamente.`, "ok");
+  } catch (error) {
+    setStatus(typeof friendlyErrorMessage === "function" ? friendlyErrorMessage(error, "clientes") : error.message, "error");
+  }
 }
 
 async function deleteRecord(collectionName, id) {
@@ -743,13 +805,17 @@ document.addEventListener("click", async (event) => {
   if (target.classList.contains("export-button")) exportRows(inferExportCollection(target));
   if (!action || !id) return;
   if (action === "edit-supplier") fillForm(supplierForm, state.proveedores.find((item) => item.id === id), "proveedores");
+  if (action === "toggle-supplier-status") await toggleSupplierStatus(id);
   if (action === "edit-product") fillForm(productForm, state.productos.find((item) => item.id === id), "productos");
+  if (action === "toggle-product-status") await toggleProductStatus(id);
   if (action === "edit-inventory") fillForm(inventoryForm, state.inventarios.find((item) => item.id === id), "inventarios");
   if (action === "delete-supplier") await deleteRecord("proveedores", id);
   if (action === "delete-product") await deleteRecord("productos", id);
   if (action === "delete-inventory") await deleteRecord("inventarios", id);
   if (action === "edit-client") fillForm(clientForm, state.clientes.find((item) => item.id === id), "clientes");
+  if (action === "toggle-client-status") await toggleClientStatus(id);
   if (action === "edit-loan") fillForm(loanForm, state.prestamos.find((item) => item.id === id), "prestamos");
+  if (action === "toggle-loan-status") await toggleLoanStatus(id);
   if (action === "edit-payment") fillForm(paymentForm, state.pagos.find((item) => item.id === id), "pagos");
   if (action === "delete-client") await deleteRecord("clientes", id);
   if (action === "delete-loan") await deleteRecord("prestamos", id);
@@ -909,8 +975,11 @@ renderSuppliers = function() {
   document.querySelector("#supplierActiveKpi").textContent = metrics.active;
   document.querySelector("#supplierEmailKpi").textContent = metrics.email;
   document.querySelector("#supplierPhoneKpi").textContent = metrics.phone;
-  supplierTable.innerHTML = state.proveedores.map((supplier) => `
-    <tr><td>${supplier.razonSocial}</td><td>${supplier.rnc}</td><td>${supplier.telefono || "-"}</td><td>${supplier.correo || "-"}</td><td><span class="tag ${tagClass(supplier.estado)}">${normalizeUiStatus(supplier.estado)}</span></td><td>-</td><td class="table-actions"><button type="button" data-action="edit-supplier" data-id="${supplier.id}">Editar</button><button type="button" data-action="delete-supplier" data-id="${supplier.id}" data-record-name="${supplier.razonSocial}">Eliminar</button></td></tr>`).join("");
+  supplierTable.innerHTML = state.proveedores.map((supplier) => {
+    const nextAction = (supplier.estado || "Activo") === "Activo" ? "Desactivar" : "Activar";
+    return `
+    <tr><td>${supplier.razonSocial}</td><td>${supplier.rnc}</td><td>${supplier.telefono || "-"}</td><td>${supplier.correo || "-"}</td><td><span class="tag ${tagClass(supplier.estado)}">${normalizeUiStatus(supplier.estado)}</span></td><td>-</td><td class="table-actions"><button type="button" data-action="edit-supplier" data-id="${supplier.id}">Editar</button><button type="button" data-action="toggle-supplier-status" data-next-status="${nextAction === "Activar" ? "Activo" : "Inactivo"}" data-id="${supplier.id}">${nextAction}</button><button type="button" data-action="delete-supplier" data-id="${supplier.id}" data-record-name="${supplier.razonSocial}">Eliminar</button></td></tr>`;
+  }).join("");
 };
 
 renderProducts = function() {
@@ -919,14 +988,21 @@ renderProducts = function() {
   document.querySelector("#categoryTotalKpi").textContent = metrics.categories;
   document.querySelector("#productLowStockKpi").textContent = metrics.lowStockProducts;
   document.querySelector("#bestProductKpi").textContent = metrics.bestSeller?.sku || "--";
-  productTable.innerHTML = state.productos.map((product) => `
-    <tr><td><span class="row-icon product-sku-icon"></span>${product.sku}</td><td><span class="row-icon product-row-icon"></span>${product.descripcion}</td><td>${product.codigoBarra || "-"}</td><td><span class="tag product-category-tag">${product.categoria || "Sin categoria"}</span></td><td>${formatMoney(product.precio)}</td><td><span class="tag ${tagClass(product.estado)}">${normalizeUiStatus(product.estado)}</span></td><td class="table-actions"><button type="button" data-action="edit-product" data-id="${product.id}">Editar</button><button type="button" data-action="delete-product" data-id="${product.id}" data-record-name="${product.descripcion}">Eliminar</button></td></tr>`).join("");
+  productTable.innerHTML = state.productos.map((product) => {
+    const stock = state.inventarios.reduce((sum, item) => item.productoId === product.id || item.sku === product.sku ? sum + Number(item.stockNeto || 0) : sum, 0);
+    const unitPrice = Number(product.precio || 0);
+    const nextAction = (product.estado || "Activo") === "Activo" ? "Desactivar" : "Activar";
+    return `
+    <tr><td><span class="row-icon product-sku-icon"></span>${product.sku}</td><td><span class="row-icon product-row-icon"></span>${product.descripcion}</td><td>${product.codigoBarra || "-"}</td><td><span class="tag product-category-tag">${product.categoria || "Sin categoria"}</span></td><td>${formatMoney(unitPrice)}</td><td>${formatMoney(stock * unitPrice)}</td><td><span class="tag ${tagClass(product.estado)}">${normalizeUiStatus(product.estado)}</span></td><td class="table-actions"><button type="button" data-action="edit-product" data-id="${product.id}">Editar</button><button type="button" data-action="toggle-product-status" data-next-status="${nextAction === "Activar" ? "Activo" : "Inactivo"}" data-id="${product.id}">${nextAction}</button><button type="button" data-action="delete-product" data-id="${product.id}" data-record-name="${product.descripcion}">Eliminar</button></td></tr>`;
+  }).join("");
 };
 
 renderInventory = function() {
   inventoryTable.innerHTML = state.inventarios.map((item) => {
     const status = normalizeUiStatus(item.estado);
-    return `<tr><td><span class="row-icon sku-icon"></span>${item.sku}</td><td><span class="row-icon product-icon"></span>${item.producto}</td><td><span class="row-icon branch-icon"></span>${item.sucursal}</td><td>${Number(item.stockNeto || 0).toLocaleString("es-DO")}</td><td>${formatMoney(item.precioUnitario)}</td><td><span class="tag ${tagClass(status)}">${status}</span></td><td>${formatDateTime(item.actualizadoEn)}</td><td class="table-actions"><button type="button" data-action="edit-inventory" data-id="${item.id}">Editar</button><button type="button" data-action="delete-inventory" data-id="${item.id}" data-record-name="${item.producto} / ${item.sucursal}">Eliminar</button></td></tr>`;
+    const stock = Number(item.stockNeto || 0);
+    const unitPrice = Number(item.precioUnitario || 0);
+    return `<tr><td><span class="row-icon sku-icon"></span>${item.sku}</td><td><span class="row-icon product-icon"></span>${item.producto}</td><td><span class="row-icon branch-icon"></span>${item.sucursal}</td><td>${stock.toLocaleString("es-DO")}</td><td>${formatMoney(unitPrice)}</td><td>${formatMoney(stock * unitPrice)}</td><td><span class="tag ${tagClass(status)}">${status}</span></td><td>${formatDateTime(item.actualizadoEn)}</td><td class="table-actions"><button type="button" data-action="edit-inventory" data-id="${item.id}">Editar</button><button type="button" data-action="delete-inventory" data-id="${item.id}" data-record-name="${item.producto} / ${item.sucursal}">Eliminar</button></td></tr>`;
   }).join("");
 };
 
@@ -944,7 +1020,7 @@ renderClients = function() {
   document.querySelector("#clientActiveKpi").textContent = metrics.active;
   document.querySelector("#clientLoanKpi").textContent = metrics.withLoans;
   document.querySelector("#clientInactiveKpi").textContent = metrics.inactive;
-  clientTable.innerHTML = state.clientes.map((client) => `<tr><td>${client.nombre}</td><td>${client.documento}</td><td>${client.telefono || "-"}</td><td>${client.correo || "-"}</td><td>${client.direccion || "-"}</td><td><span class="tag ${tagClass(client.estado)}">${normalizeUiStatus(client.estado)}</span></td><td class="table-actions"><button type="button" data-action="edit-client" data-id="${client.id}">Editar</button><button type="button" data-action="delete-client" data-id="${client.id}" data-record-name="${client.nombre}">Eliminar</button></td></tr>`).join("");
+  clientTable.innerHTML = state.clientes.map((client) => { const nextAction = (client.estado || "Activo") === "Activo" ? "Desactivar" : "Activar"; return `<tr><td>${client.nombre}</td><td>${client.documento}</td><td>${client.telefono || "-"}</td><td>${client.correo || "-"}</td><td>${client.direccion || "-"}</td><td><span class="tag ${tagClass(client.estado)}">${normalizeUiStatus(client.estado)}</span></td><td class="table-actions"><button type="button" data-action="edit-client" data-id="${client.id}">Editar</button><button type="button" data-action="toggle-client-status" data-next-status="${nextAction === "Activar" ? "Activo" : "Inactivo"}" data-id="${client.id}">${nextAction}</button><button type="button" data-action="delete-client" data-id="${client.id}" data-record-name="${client.nombre}">Eliminar</button></td></tr>`; }).join("");
   renderClientOptions();
 };
 
@@ -955,7 +1031,7 @@ renderLoans = function() {
   document.querySelector("#loanActiveKpi").textContent = metrics.active;
   document.querySelector("#loanAmountKpi").textContent = formatMoney(metrics.amount);
   document.querySelector("#loanBalanceKpi").textContent = formatMoney(metrics.balance);
-  loanTable.innerHTML = state.prestamos.map((loan) => `<tr><td>${loan.cliente}</td><td>${formatMoney(loan.monto)}</td><td>${Number(loan.tasa || 0).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</td><td>${loan.plazoMeses} meses</td><td>${formatMoney(loan.balancePendiente)}</td><td><span class="tag ${tagClass(loan.estado)}">${normalizeUiStatus(loan.estado)}</span></td><td>${formatDate(loan.fecha)}</td><td class="table-actions"><button type="button" data-action="edit-loan" data-id="${loan.id}">Editar</button><button type="button" data-action="delete-loan" data-id="${loan.id}" data-record-name="${loan.cliente}">Eliminar</button></td></tr>`).join("");
+  loanTable.innerHTML = state.prestamos.map((loan) => { const nextAction = loan.estado === "Activo" ? "Anular" : "Activar"; return `<tr><td>${loan.cliente}</td><td>${formatMoney(loan.monto)}</td><td>${Number(loan.tasa || 0).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</td><td>${loan.plazoMeses} meses</td><td>${formatMoney(loan.balancePendiente)}</td><td><span class="tag ${tagClass(loan.estado)}">${normalizeUiStatus(loan.estado)}</span></td><td>${formatDate(loan.fecha)}</td><td class="table-actions"><button type="button" data-action="edit-loan" data-id="${loan.id}">Editar</button><button type="button" data-action="toggle-loan-status" data-next-status="${nextAction === "Activar" ? "Activo" : "Anulado"}" data-id="${loan.id}">${nextAction}</button><button type="button" data-action="delete-loan" data-id="${loan.id}" data-record-name="${loan.cliente}">Eliminar</button></td></tr>`; }).join("");
   renderClientOptions();
 };
 

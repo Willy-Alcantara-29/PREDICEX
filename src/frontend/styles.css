@@ -3585,3 +3585,73 @@ select:focus,
   color: #94a3b8;
   font-weight: 800;
 }
+/* Boton de activar/desactivar proveedores */
+.suppliers-panel .table-actions button[data-action="toggle-supplier-status"] {
+  border-color: rgba(74, 222, 128, 0.42);
+  color: #86efac;
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.42), rgba(22, 101, 52, 0.24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 20px rgba(22, 163, 74, 0.14);
+}
+
+.suppliers-panel .table-actions button[data-action="toggle-supplier-status"][data-next-status="Inactivo"] {
+  border-color: rgba(251, 191, 36, 0.44);
+  color: #fcd34d;
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.44), rgba(146, 64, 14, 0.24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 20px rgba(217, 119, 6, 0.14);
+}
+
+.suppliers-panel .table-actions button[data-action="toggle-supplier-status"]::before {
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 6 9 17l-5-5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.suppliers-panel .table-actions button[data-action="toggle-supplier-status"][data-next-status="Inactivo"]::before {
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 8v5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* Boton de activar/desactivar clientes */
+#clientsView .table-actions button[data-action="toggle-client-status"] {
+  border-color: rgba(74, 222, 128, 0.42);
+  color: #86efac;
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.42), rgba(22, 101, 52, 0.24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 20px rgba(22, 163, 74, 0.14);
+}
+
+#clientsView .table-actions button[data-action="toggle-client-status"][data-next-status="Inactivo"] {
+  border-color: rgba(251, 191, 36, 0.44);
+  color: #fcd34d;
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.44), rgba(146, 64, 14, 0.24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 20px rgba(217, 119, 6, 0.14);
+}
+
+#clientsView .table-actions button[data-action="toggle-client-status"]::before {
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 6 9 17l-5-5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+#clientsView .table-actions button[data-action="toggle-client-status"][data-next-status="Inactivo"]::before {
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 8v5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* Botones de activar/desactivar productos y prestamos */
+#productsView .table-actions button[data-action="toggle-product-status"],
+#loansView .table-actions button[data-action="toggle-loan-status"] {
+  border-color: rgba(74, 222, 128, 0.42);
+  color: #86efac;
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.42), rgba(22, 101, 52, 0.24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 20px rgba(22, 163, 74, 0.14);
+}
+
+#productsView .table-actions button[data-action="toggle-product-status"][data-next-status="Inactivo"],
+#loansView .table-actions button[data-action="toggle-loan-status"][data-next-status="Anulado"] {
+  border-color: rgba(251, 191, 36, 0.44);
+  color: #fcd34d;
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.44), rgba(146, 64, 14, 0.24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 20px rgba(217, 119, 6, 0.14);
+}
+
+#productsView .table-actions button[data-action="toggle-product-status"]::before,
+#loansView .table-actions button[data-action="toggle-loan-status"]::before {
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 6 9 17l-5-5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+#productsView .table-actions button[data-action="toggle-product-status"][data-next-status="Inactivo"]::before,
+#loansView .table-actions button[data-action="toggle-loan-status"][data-next-status="Anulado"]::before {
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 8v5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
