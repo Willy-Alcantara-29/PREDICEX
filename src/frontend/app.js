@@ -190,11 +190,16 @@ function confirmAction({ title, message, confirmText = "Confirmar", cancelText =
     overlay.querySelector(".confirm-cancel")?.focus();
   });
 }
+let statusTimer = null;
 function setStatus(message, type = "info") {
-  statusMessage.textContent = message;
+  if (!statusMessage) return;
+  if (statusTimer) clearTimeout(statusTimer);
+  statusMessage.innerHTML = `<span>${escapeHtml(message)}</span><button type="button" class="status-close" aria-label="Cerrar notificacion">Cerrar</button>`;
   statusMessage.className = `status-note ${type}`;
+  statusMessage.querySelector(".status-close")?.addEventListener("click", () => statusMessage.classList.add("hidden"), { once: true });
+  statusMessage.classList.remove("hidden");
+  statusTimer = setTimeout(() => statusMessage.classList.add("hidden"), type === "error" ? 7000 : 4200);
 }
-
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -1389,27 +1394,36 @@ function renderOperationsModules() {
   }
 }
 function purchaseOrderSuggestions() {
-  return (state.inventarios || [])
-    .filter((item) => Number(item.stockNeto || 0) <= Number(item.umbralAlerta || 0))
-    .map((item, index) => {
-      const deficit = Math.max(Number(item.umbralAlerta || 0) - Number(item.stockNeto || 0), 0);
-      const suggested = Math.max(deficit + Number(item.umbralAlerta || 0), 1);
-      const product = (state.productos || []).find((prod) => prod.sku === item.sku) || {};
-      const supplier = (state.proveedores || [])[index % Math.max((state.proveedores || []).length, 1)] || {};
-      return {
-        id: `oc-${item.id || index}`,
-        sku: item.sku,
-        producto: item.producto,
-        sucursal: item.sucursal,
-        proveedor: supplier.razonSocial || "Proveedor por asignar",
-        cantidad: suggested,
-        costo: suggested * Number(item.precioUnitario || product.precio || 0),
-        estado: Number(item.stockNeto || 0) <= 0 ? "Critica" : "Pendiente",
-        prioridad: Number(item.stockNeto || 0) <= 0 ? "Alta" : "Media",
-      };
-    });
-}
+  const inventories = state.inventarios || [];
+  const lowStock = inventories.filter((item) => Number(item.stockNeto || 0) <= Number(item.umbralAlerta || 0));
+  const coverageCandidates = inventories
+    .filter((item) => !lowStock.some((low) => low.id === item.id))
+    .sort((a, b) => (Number(a.stockNeto || 0) / Math.max(Number(a.umbralAlerta || 1), 1)) - (Number(b.stockNeto || 0) / Math.max(Number(b.umbralAlerta || 1), 1)));
+  const candidates = [...lowStock, ...coverageCandidates].slice(0, Math.max(3, lowStock.length));
 
+  return candidates.map((item, index) => {
+    const stock = Number(item.stockNeto || 0);
+    const threshold = Number(item.umbralAlerta || 0);
+    const deficit = Math.max(threshold - stock, 0);
+    const suggested = deficit > 0 ? Math.max(deficit + threshold, 1) : Math.max(threshold, 1);
+    const product = (state.productos || []).find((prod) => prod.sku === item.sku) || {};
+    const activeSuppliers = (state.proveedores || []).filter((supplier) => supplier.estado !== "Inactivo");
+    const supplier = (activeSuppliers.length ? activeSuppliers : state.proveedores || [])[index % Math.max((activeSuppliers.length || (state.proveedores || []).length), 1)] || {};
+    const isCritical = stock <= 0;
+    const isBelowThreshold = stock <= threshold;
+    return {
+      id: `oc-${item.id || index}`,
+      sku: item.sku,
+      producto: item.producto,
+      sucursal: item.sucursal,
+      proveedor: supplier.razonSocial || "Proveedor por asignar",
+      cantidad: suggested,
+      costo: suggested * Number(item.precioUnitario || product.precio || 0),
+      estado: isCritical ? "Critica" : isBelowThreshold ? "Pendiente" : "Planificada",
+      prioridad: isCritical ? "Alta" : isBelowThreshold ? "Media" : "Baja",
+    };
+  });
+}
 function ensurePurchaseOrdersView() {
   const workspace = document.querySelector(".workspace");
   if (!workspace || document.querySelector("#purchaseOrdersView")) return;
@@ -1964,36 +1978,58 @@ function ensureUsersRolesView() {
   if (!workspace || document.querySelector("#usersRolesView")) return;
   workspace.insertAdjacentHTML("beforeend", `
     <section id="usersRolesView" class="view">
-      <article class="panel access-panel products-panel">
-        <div class="panel-heading products-heading">
-          <div>
-            <p class="eyebrow">Control</p>
-            <h3>Usuarios y roles</h3>
-            <span>Usuarios activos y permisos aplicados por el backend</span>
+      <article class="access-panel access-modern-panel">
+        <header class="access-header">
+          <div class="access-title-row">
+            <span class="access-title-icon" aria-hidden="true">${menuIcon("users")}</span>
+            <div>
+              <p class="eyebrow">Control de acceso</p>
+              <h3>Usuarios y roles</h3>
+              <span>Gestion visual de perfiles, sesiones y permisos aplicados por el backend.</span>
+            </div>
           </div>
-          <button id="refreshUsersRolesButton" type="button" class="small-button secondary-action">Actualizar</button>
-        </div>
-        <div class="predictive-kpis access-kpis">
+          <button id="refreshUsersRolesButton" type="button" class="access-refresh-button">Actualizar</button>
+        </header>
+        <div class="access-kpi-grid">
           <article><span>Usuarios</span><strong id="usersTotalKpi">0</strong></article>
           <article><span>Roles</span><strong id="rolesTotalKpi">0</strong></article>
           <article><span>Sesiones activas</span><strong id="sessionsTotalKpi">0</strong></article>
           <article><span>Rol actual</span><strong id="currentRoleKpi">-</strong></article>
         </div>
-        <div class="access-grid">
-          <article class="access-card">
-            <div class="panel-heading"><div><h3>Usuarios</h3><span>Cuentas habilitadas para autenticacion</span></div></div>
-            <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Sesion</th></tr></thead><tbody id="usersTableBody"></tbody></table></div>
+        <section class="access-layout">
+          <article class="access-card access-users-card">
+            <div class="access-section-heading"><div><h3>Usuarios</h3><span>Cuentas habilitadas y rol asignado</span></div></div>
+            <div id="usersCardGrid" class="users-card-grid"></div>
+            <div class="table-wrap access-table-wrap"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Sesion</th></tr></thead><tbody id="usersTableBody"></tbody></table></div>
           </article>
-          <article class="access-card">
-            <div class="panel-heading"><div><h3>Roles</h3><span>Permisos validados por endpoint</span></div></div>
-            <div class="table-wrap"><table><thead><tr><th>Rol</th><th>Permisos</th></tr></thead><tbody id="rolesTableBody"></tbody></table></div>
+          <article class="access-card access-roles-card">
+            <div class="access-section-heading"><div><h3>Roles</h3><span>Permisos por perfil operativo</span></div></div>
+            <div id="rolesCardGrid" class="roles-card-grid"></div>
           </article>
-        </div>
+        </section>
       </article>
     </section>`);
   document.querySelector("#refreshUsersRolesButton")?.addEventListener("click", loadUsersRolesData);
 }
 
+function roleDescription(role) {
+  const descriptions = {
+    Administrador: "Acceso completo a gestion, auditoria, exportaciones y respaldos.",
+    Operador: "Operacion diaria con lectura, escritura y exportacion sin acciones criticas.",
+    Consulta: "Acceso de solo lectura para revision, reportes y seguimiento.",
+  };
+  return descriptions[role] || "Perfil operativo configurado en backend.";
+}
+
+function roleClass(role) {
+  if (role === "Administrador") return "admin";
+  if (role === "Operador") return "operator";
+  return "viewer";
+}
+
+function userInitials(user) {
+  return String(user.nombre || user.email || "U").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+}
 async function loadUsersRolesData() {
   try {
     ensureUsersRolesView();
@@ -2012,47 +2048,97 @@ function renderUsersRolesView() {
   document.querySelector("#rolesTotalKpi") && (document.querySelector("#rolesTotalKpi").textContent = data.roles.length);
   document.querySelector("#sessionsTotalKpi") && (document.querySelector("#sessionsTotalKpi").textContent = data.sesionesActivas || 0);
   document.querySelector("#currentRoleKpi") && (document.querySelector("#currentRoleKpi").textContent = state.auth.user?.rol || "-");
-  const usersTable = document.querySelector("#usersTableBody");
-  if (usersTable) usersTable.innerHTML = data.usuarios.map((user) => `<tr><td>${user.nombre}</td><td>${user.email}</td><td><span class="tag info">${user.rol}</span></td><td><span class="tag ${tagClass(user.estado)}">${user.estado}</span></td><td>${user.sesionActual ? "Actual" : "-"}</td></tr>`).join("");
-  const rolesTable = document.querySelector("#rolesTableBody");
-  if (rolesTable) rolesTable.innerHTML = data.roles.map((role) => `<tr><td>${role.rol}</td><td>${role.permisos.map((permission) => `<span class="tag info permission-pill">${permissionLabel(permission)}</span>`).join("")}</td></tr>`).join("");
-}
 
-function ensureSettingsView() {
+  const usersCardGrid = document.querySelector("#usersCardGrid");
+  if (usersCardGrid) {
+    usersCardGrid.innerHTML = data.usuarios.map((user) => `<article class="user-profile-card ${user.sesionActual ? "current" : ""}"><span class="user-avatar">${userInitials(user)}</span><div><strong>${user.nombre}</strong><span>${user.email}</span></div><em class="role-badge ${roleClass(user.rol)}">${user.rol}</em><small class="tag ${tagClass(user.estado)}">${user.sesionActual ? "Sesion actual" : user.estado}</small></article>`).join("");
+  }
+
+  const usersTable = document.querySelector("#usersTableBody");
+  if (usersTable) usersTable.innerHTML = data.usuarios.map((user) => `<tr><td>${user.nombre}</td><td>${user.email}</td><td><span class="role-badge ${roleClass(user.rol)}">${user.rol}</span></td><td><span class="tag ${tagClass(user.estado)}">${user.estado}</span></td><td>${user.sesionActual ? "Actual" : "-"}</td></tr>`).join("");
+
+  const rolesCardGrid = document.querySelector("#rolesCardGrid");
+  if (rolesCardGrid) {
+    rolesCardGrid.innerHTML = data.roles.map((role) => `<article class="role-card ${roleClass(role.rol)}"><div class="role-card-top"><span class="role-icon">${menuIcon(role.rol === "Administrador" ? "settings" : role.rol === "Operador" ? "movements" : "reports")}</span><div><h4>${role.rol}</h4><p>${roleDescription(role.rol)}</p></div></div><div class="permission-list">${role.permisos.map((permission) => `<span class="permission-pill ${permission}">${permissionLabel(permission)}</span>`).join("")}</div></article>`).join("");
+  }
+}function ensureSettingsView() {
   const workspace = document.querySelector(".workspace");
   if (!workspace || document.querySelector("#settingsView")) return;
   workspace.insertAdjacentHTML("beforeend", `
     <section id="settingsView" class="view">
-      <article class="panel settings-panel products-panel">
-        <div class="panel-heading products-heading">
-          <div>
-            <p class="eyebrow">Sistema</p>
-            <h3>Configuracion</h3>
-            <span>Preferencias operativas no sensibles del sistema</span>
+      <article class="settings-panel settings-modern-panel">
+        <div class="settings-header">
+          <div class="settings-title-row">
+            <span class="settings-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1.82V22a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8.6 20a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.82-.33H2a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4 8.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1.82V2a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15.4 4a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.3.31.5.7.6 1.1H22a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.82.9Z"/></svg></span>
+            <div><h3>Configuracion</h3><span>Preferencias y parametros generales del sistema</span></div>
           </div>
-          <button id="refreshSettingsButton" type="button" class="small-button secondary-action">Actualizar</button>
+          <div class="settings-header-actions">
+            <span class="settings-sync-pill"><i></i>Sistema sincronizado</span>
+            <button id="refreshSettingsButton" type="button" class="settings-icon-button" title="Actualizar configuracion" aria-label="Actualizar configuracion"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12A9 9 0 0 1 18.5 5.8"/><path d="M3 19v-5h5"/><path d="M21 5v5h-5"/></svg></button>
+          </div>
         </div>
-        <form id="settingsForm" class="crud-form settings-form">
-          <label>Empresa<span class="field-shell branch-field"><input name="empresaNombre" required /></span></label>
-          <label>Moneda<span class="field-shell supplier-status-field"><input name="moneda" required maxlength="3" /></span></label>
-          <label>Zona horaria<span class="field-shell product-description-field"><input name="zonaHoraria" required /></span></label>
-          <label>Registros por pagina<span class="field-shell stock-field"><input name="registrosPorPagina" type="number" min="5" max="100" required /></span></label>
-          <label>Directorio de respaldos<span class="field-shell product-description-field"><input name="respaldoDirectorio" required /></span></label>
-          <button type="submit" class="small-button" data-default-text="Guardar configuracion">Guardar configuracion</button>
+
+        <nav class="settings-tabs" aria-label="Secciones de configuracion">
+          <button type="button" class="active" data-settings-tab="general">General</button>
+          <button type="button" data-settings-tab="database">Base de datos</button>
+          <button type="button" data-settings-tab="backups">Respaldos</button>
+          <button type="button" data-settings-tab="security">Seguridad</button>
+          <button type="button" data-settings-tab="appearance">Apariencia</button>
+        </nav>
+
+        <form id="settingsForm" class="settings-shell">
+          <div class="settings-tab-panel active" data-settings-panel="general">
+            <div class="settings-two-cards">
+              <article class="settings-card">
+                <div class="settings-card-title"><span class="settings-card-icon company"></span><h4>Informacion de la empresa</h4></div>
+                <div class="settings-fields three-fields">
+                  <label>Empresa<span class="field-shell branch-field"><input name="empresaNombre" required /></span></label>
+                  <label>Moneda<span class="field-shell supplier-status-field"><input name="moneda" required maxlength="3" /></span></label>
+                  <label>Zona horaria<span class="field-shell product-description-field"><input name="zonaHoraria" required /></span></label>
+                </div>
+              </article>
+              <article class="settings-card">
+                <div class="settings-card-title"><span class="settings-card-icon sliders"></span><h4>Preferencias del sistema</h4></div>
+                <div class="settings-fields preferences-grid">
+                  <label>Registros por pagina<span class="field-shell stock-field"><input name="registrosPorPagina" type="number" min="5" max="100" required /></span></label>
+                  <label>Idioma<select name="idioma"><option>Espanol</option></select></label>
+                  <label>Formato de fecha<select name="formatoFecha"><option value="dd/MM/yyyy">dd/MM/yyyy</option></select></label>
+                  <label class="settings-switch-row"><span>Confirmar eliminaciones</span><input name="confirmarEliminaciones" type="checkbox" checked /><i></i></label>
+                  <label class="settings-switch-row"><span>Notificaciones del sistema</span><input name="notificacionesSistema" type="checkbox" checked /><i></i></label>
+                </div>
+              </article>
+            </div>
+            <article class="settings-strip">
+              <div class="settings-strip-title"><span class="settings-card-icon database"></span><div><h4>Estado de la base de datos</h4><span id="settingsDbStatus" class="settings-status ok"><i></i>Conectado</span></div></div>
+              <div class="settings-strip-values"><span>Motor<strong>SQL Server</strong></span><span>Servidor<strong id="settingsSqlServerKpi">-</strong></span><span>Base de datos<strong id="settingsSqlDbKpi">-</strong></span></div>
+              <button id="testSqlConnectionButton" type="button" class="settings-secondary-button">Probar conexion</button>
+            </article>
+            <article class="settings-strip backup-strip">
+              <div class="settings-strip-title"><span class="settings-card-icon backup"></span><div><h4>Respaldos automaticos</h4><span>Politica operativa de respaldo</span></div></div>
+              <label>Directorio de respaldos<span class="field-shell product-description-field"><input name="respaldoDirectorio" required /></span></label>
+              <label>Frecuencia<select name="frecuenciaRespaldos"><option>Manual</option><option>Diaria</option><option>Semanal</option></select></label>
+              <span class="settings-last-backup">Ultimo respaldo<strong id="settingsLastBackupKpi">-</strong></span>
+              <button id="settingsCreateBackupButton" type="button" class="settings-secondary-button">Crear respaldo ahora</button>
+            </article>
+          </div>
+          <div class="settings-tab-panel" data-settings-panel="database"><article class="settings-card settings-full-card"><div class="settings-card-title"><span class="settings-card-icon database"></span><h4>Base de datos</h4></div><div class="settings-summary-grid"><span>Modo de datos<strong id="settingsModeKpi">-</strong></span><span>Motor<strong>SQL Server</strong></span><span>Servidor<strong id="settingsSqlServerDetail">-</strong></span><span>Base de datos<strong id="settingsSqlDbDetail">-</strong></span></div></article></div>
+          <div class="settings-tab-panel" data-settings-panel="backups"><article class="settings-card settings-full-card"><div class="settings-card-title"><span class="settings-card-icon backup"></span><h4>Respaldos</h4></div><div class="settings-summary-grid"><span>Directorio<strong id="settingsBackupDirectorySummary">-</strong></span><span>Frecuencia<strong>Manual</strong></span><span>Ultimo respaldo<strong id="settingsLastBackupDetail">-</strong></span></div></article></div>
+          <div class="settings-tab-panel" data-settings-panel="security"><article class="settings-card settings-full-card"><div class="settings-card-title"><span class="settings-card-icon security"></span><h4>Seguridad</h4></div><div class="settings-summary-grid"><span>Administrador<strong id="settingsAdminKpi">-</strong></span><span>Rol actual<strong id="settingsCurrentRoleKpi">-</strong></span><span>Confirmacion de borrado<strong>Activa</strong></span></div></article></div>
+          <div class="settings-tab-panel" data-settings-panel="appearance"><article class="settings-card settings-full-card"><div class="settings-card-title"><span class="settings-card-icon appearance"></span><h4>Apariencia</h4></div><div class="settings-summary-grid"><span>Tema<strong>Oscuro</strong></span><span>Paleta<strong>Azul / Cian</strong></span><span>Fuente<strong>Segoe UI</strong></span></div></article></div>
+          <div class="settings-footer-actions"><button id="discardSettingsButton" type="button" class="settings-secondary-button">Descartar cambios</button><button type="submit" class="settings-primary-button" data-default-text="Guardar configuracion">Guardar configuracion</button></div>
         </form>
-        <div class="settings-grid">
-          <article><span>Modo de datos</span><strong id="settingsModeKpi">-</strong></article>
-          <article><span>SQL Server</span><strong id="settingsSqlServerKpi">-</strong></article>
-          <article><span>Base de datos</span><strong id="settingsSqlDbKpi">-</strong></article>
-          <article><span>Administrador</span><strong id="settingsAdminKpi">-</strong></article>
-        </div>
       </article>
     </section>`);
   document.querySelector("#refreshSettingsButton")?.addEventListener("click", loadConfigurationData);
+  document.querySelectorAll("[data-settings-tab]").forEach((button) => button.addEventListener("click", () => activateSettingsTab(button.dataset.settingsTab)));
+  document.querySelector("#discardSettingsButton")?.addEventListener("click", discardSettingsChanges);
+  document.querySelector("#testSqlConnectionButton")?.addEventListener("click", testSqlConnection);
+  document.querySelector("#settingsCreateBackupButton")?.addEventListener("click", createSettingsBackup);
   document.querySelector("#settingsForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = getFormData(form);
+    const rawData = getFormData(form);
+    const data = { empresaNombre: rawData.empresaNombre, moneda: rawData.moneda, zonaHoraria: rawData.zonaHoraria, registrosPorPagina: rawData.registrosPorPagina, respaldoDirectorio: rawData.respaldoDirectorio };
     await withButtonLock(form, async () => {
       state.configuration = await apiRequest("/configuracion", { method: "PUT", body: JSON.stringify(data) });
       renderSettingsView();
@@ -2061,10 +2147,49 @@ function ensureSettingsView() {
   });
 }
 
+function activateSettingsTab(tabId) {
+  document.querySelectorAll("[data-settings-tab]").forEach((button) => button.classList.toggle("active", button.dataset.settingsTab === tabId));
+  document.querySelectorAll("[data-settings-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.settingsPanel === tabId));
+}
+
+function discardSettingsChanges() {
+  renderSettingsView();
+  setStatus("Cambios de configuracion descartados.", "ok");
+}
+
+async function testSqlConnection() {
+  const button = document.querySelector("#testSqlConnectionButton");
+  const originalText = button?.textContent || "Probar conexion";
+  if (button) { button.disabled = true; button.textContent = "Probando..."; }
+  try {
+    const health = await apiRequest("/health");
+    const connected = health.mode !== "demo";
+    const dbStatus = document.querySelector("#settingsDbStatus");
+    if (dbStatus) { dbStatus.classList.toggle("ok", connected); dbStatus.innerHTML = `<i></i>${connected ? "Conectado" : "Modo demo"}`; }
+    setStatus(connected ? "Conexion SQL Server verificada correctamente." : "El backend respondio en modo demostracion.", connected ? "ok" : "error");
+  } catch (error) {
+    setStatus(error.message, "error");
+  } finally {
+    if (button) { button.disabled = false; button.textContent = originalText; }
+  }
+}
+
+async function createSettingsBackup() {
+  await createManualBackup();
+  renderSettingsBackupSummary();
+}
+
+function renderSettingsBackupSummary() {
+  const latest = (state.backups.items || [])[0];
+  const label = latest ? formatDateTime(latest.fecha) : "-";
+  document.querySelector("#settingsLastBackupKpi") && (document.querySelector("#settingsLastBackupKpi").textContent = label);
+  document.querySelector("#settingsLastBackupDetail") && (document.querySelector("#settingsLastBackupDetail").textContent = label);
+}
 async function loadConfigurationData() {
   try {
     ensureSettingsView();
     state.configuration = await apiRequest("/configuracion");
+    await loadBackupsData().catch(() => {});
     renderSettingsView();
     setStatus("Configuracion actualizada.", "ok");
   } catch (error) {
@@ -2083,11 +2208,21 @@ function renderSettingsView() {
     form.zonaHoraria.value = config.zonaHoraria || "";
     form.registrosPorPagina.value = config.registrosPorPagina || 20;
     form.respaldoDirectorio.value = config.respaldoDirectorio || "";
+    if (form.idioma) form.idioma.value = "Espanol";
+    if (form.formatoFecha) form.formatoFecha.value = config.formatoFecha || "dd/MM/yyyy";
+    if (form.frecuenciaRespaldos) form.frecuenciaRespaldos.value = "Manual";
+    if (form.confirmarEliminaciones) form.confirmarEliminaciones.checked = true;
+    if (form.notificacionesSistema) form.notificacionesSistema.checked = true;
   }
   document.querySelector("#settingsModeKpi") && (document.querySelector("#settingsModeKpi").textContent = config.modoDatos || "-");
   document.querySelector("#settingsSqlServerKpi") && (document.querySelector("#settingsSqlServerKpi").textContent = config.sqlServer || "-");
   document.querySelector("#settingsSqlDbKpi") && (document.querySelector("#settingsSqlDbKpi").textContent = config.sqlDatabase || "-");
+  document.querySelector("#settingsSqlServerDetail") && (document.querySelector("#settingsSqlServerDetail").textContent = config.sqlServer || "-");
+  document.querySelector("#settingsSqlDbDetail") && (document.querySelector("#settingsSqlDbDetail").textContent = config.sqlDatabase || "-");
   document.querySelector("#settingsAdminKpi") && (document.querySelector("#settingsAdminKpi").textContent = config.adminEmail || "-");
+  document.querySelector("#settingsCurrentRoleKpi") && (document.querySelector("#settingsCurrentRoleKpi").textContent = state.auth.user?.rol || "-");
+  document.querySelector("#settingsBackupDirectorySummary") && (document.querySelector("#settingsBackupDirectorySummary").textContent = config.respaldoDirectorio || "-");
+  renderSettingsBackupSummary();
 }
 // Backups and help modules
 state.backups = { items: [], pagination: { page: 1, pageSize: 10, total: 0, totalPages: 1 } };
@@ -2193,33 +2328,151 @@ function renderBackupsView() {
   body.innerHTML = items.map((item) => `<tr><td>${formatDateTime(item.fecha)}</td><td>${item.nombre || "-"}</td><td><span class="tag ${item.estado === "Completado" ? "ok" : "empty"}">${item.estado}</span></td><td>${item.validado ? "Si" : "No"}</td><td>${item.usuario || "-"}</td><td>${item.ubicacion || "-"}</td><td>${item.mensaje || "-"}</td></tr>`).join("");
 }
 
+function helpIcon(name) {
+  return `<svg aria-hidden="true" viewBox="0 0 24 24">${iconPaths[name] || iconPaths.help}</svg>`;
+}
+
+const helpTopics = [
+  { title: "Primeros pasos", description: "Conoce el flujo principal, panel operativo y navegacion por modulos.", view: "dashboardView", icon: "dashboard", terms: "inicio dashboard navegacion sistema" },
+  { title: "Inventario y productos", description: "Gestiona existencias, catalogos, umbrales y productos activos.", view: "inventoryView", icon: "inventory", terms: "inventario productos stock sku umbrales" },
+  { title: "Movimientos y transferencias", description: "Registra entradas, salidas, ajustes y traslados entre sucursales.", view: "movementsView", icon: "transfer", terms: "movimientos transferencias entradas salidas ajustes" },
+  { title: "Clientes, prestamos y pagos", description: "Administra cartera comercial, prestamos, balances y pagos aplicados.", view: "clientsView", icon: "clients", terms: "clientes prestamos pagos cartera" },
+  { title: "Reportes y auditoria", description: "Consulta reportes operativos, exportaciones y trazabilidad del sistema.", view: "reportsView", icon: "reports", terms: "reportes auditoria exportacion trazabilidad" },
+  { title: "Usuarios, roles y seguridad", description: "Revisa permisos, roles activos y validaciones de acceso por modulo.", view: "usersRolesView", icon: "users", terms: "usuarios roles seguridad permisos acceso" },
+];
+
+const helpFaqs = [
+  { question: "Como accedo al sistema?", answer: "Ingresa con tu cuenta autorizada. Si no puedes acceder, solicita al administrador que revise tu usuario y rol." },
+  { question: "Por que no veo algunas opciones?", answer: "El menu se adapta a los permisos del rol activo. Las acciones sensibles se validan nuevamente en el backend." },
+  { question: "Como se actualiza el stock?", answer: "El stock cambia al registrar entradas, salidas, transferencias o ajustes desde los modulos operativos." },
+  { question: "Como funcionan los respaldos?", answer: "Los respaldos se ejecutan desde el modulo Respaldos y quedan registrados en auditoria con su estado de validacion." },
+  { question: "Que formato de fecha utiliza PREDICEX?", answer: "La interfaz usa formato dominicano para lectura y conserva fechas tecnicas en formato compatible con SQL Server." },
+  { question: "Que hago si falla la conexion?", answer: "Revisa Configuracion, prueba la conexion y valida que SQL Server este disponible antes de diagnosticar datos." },
+];
+
 function ensureHelpView() {
   const workspace = document.querySelector(".workspace");
   if (!workspace || document.querySelector("#helpView")) return;
   workspace.insertAdjacentHTML("beforeend", `
     <section id="helpView" class="view">
-      <article class="panel help-panel products-panel">
-        <div class="panel-heading products-heading">
-          <div>
-            <p class="eyebrow">Sistema</p>
-            <h3>Ayuda</h3>
-            <span>Guia rapida de operacion y soporte de Predicex</span>
+      <article class="help-panel help-modern-panel">
+        <header class="help-hero">
+          <div class="help-hero-copy">
+            <p class="eyebrow">Soporte operativo</p>
+            <h3>Centro de ayuda</h3>
+            <span>Encuentra respuestas rapidas y aprende a utilizar PREDICEX.</span>
           </div>
-        </div>
-        <div class="help-grid">
-          <article><h3>Acceso demo</h3><p><strong>Usuario:</strong> admin@predicex.local</p><p><strong>Clave:</strong> predicex2026</p></article>
-          <article><h3>Flujo operativo</h3><p>Inicia en Inventario, registra entradas, salidas o transferencias, revisa Alertas y confirma Reportes.</p></article>
-          <article><h3>Seguridad</h3><p>Los permisos se validan en backend. Si una accion no aparece o falla, revisa el rol del usuario conectado.</p></article>
-          <article><h3>Respaldos</h3><p>Solo Administrador puede crear respaldos. Cada intento queda registrado en Auditoria.</p></article>
-          <article><h3>Formato</h3><p>Fechas en formato dominicano y montos en RD$ con dos decimales.</p></article>
-          <article><h3>Soporte tecnico</h3><p>Revisa Auditoria, Reportes y Configuracion antes de diagnosticar errores de datos o conexion.</p></article>
-        </div>
+          <form id="helpSearchForm" class="help-search" role="search">
+            <input id="helpSearchInput" type="search" placeholder="En que podemos ayudarte?" autocomplete="off" />
+            <button type="submit">Buscar</button>
+          </form>
+          <div class="help-quick-links" aria-label="Accesos rapidos">
+            <button type="button" data-help-view="inventoryView">Inventario</button>
+            <button type="button" data-help-view="movementsView">Movimientos</button>
+            <button type="button" data-help-view="transfersView">Transferencias</button>
+            <button type="button" data-help-view="reportsView">Reportes</button>
+            <button type="button" data-help-view="backupsView">Respaldos</button>
+          </div>
+        </header>
+
+        <section class="help-section" aria-labelledby="helpTopicsTitle">
+          <div class="help-section-heading"><h3 id="helpTopicsTitle">Temas de ayuda</h3><span id="helpSearchResult">6 guias disponibles</span></div>
+          <div id="helpTopicsGrid" class="help-topics-grid">
+            ${helpTopics.map((topic) => `<article class="help-topic-card" data-help-topic data-help-view="${topic.view}" data-help-search="${topic.title} ${topic.description} ${topic.terms}"><span class="help-topic-icon">${helpIcon(topic.icon)}</span><h4>${topic.title}</h4><p>${topic.description}</p><button type="button" data-help-view="${topic.view}">Ver guia</button></article>`).join("")}
+          </div>
+        </section>
+
+        <section class="help-lower-grid">
+          <article class="help-card faq-card">
+            <div class="help-section-heading"><h3>Preguntas frecuentes</h3><span>Respuestas rapidas</span></div>
+            <div id="helpFaqList" class="help-faq-list">
+              ${helpFaqs.map((item, index) => `<details data-help-faq data-help-search="${item.question} ${item.answer}" ${index === 0 ? "open" : ""}><summary>${item.question}</summary><p>${item.answer}</p></details>`).join("")}
+            </div>
+          </article>
+
+          <aside class="help-side-column">
+            <article class="help-card help-system-status">
+              <div class="help-section-heading"><h3>Estado del sistema</h3><span>Monitoreo actual</span></div>
+              <div class="system-status-list">
+                <span>Base de datos<strong class="ok">Conectada</strong></span>
+                <span>Stock<strong class="ok">Sincronizado</strong></span>
+                <span>Ultimo respaldo<strong id="helpLastBackup">-</strong></span>
+                <span>Version instalada<strong id="helpInstalledVersion">0.1.0</strong></span>
+              </div>
+            </article>
+            <article class="help-card support-card">
+              <div class="help-section-heading"><h3>Soporte tecnico</h3><span>Asistencia operativa</span></div>
+              <div class="support-lines">
+                <span>Correo<strong>soporte@predicex.local</strong></span>
+                <span>Horario<strong>Lunes a viernes, 8:00 AM - 6:00 PM</strong></span>
+                <span>Version del sistema<strong id="helpSupportVersion">0.1.0</strong></span>
+              </div>
+              <div class="support-actions">
+                <button id="copyHelpTechInfo" type="button" class="help-secondary-button">Copiar informacion tecnica</button>
+                <button id="contactHelpSupport" type="button" class="help-primary-button">Contactar soporte</button>
+              </div>
+            </article>
+          </aside>
+        </section>
       </article>
     </section>`);
+  document.querySelector("#helpSearchForm")?.addEventListener("submit", (event) => { event.preventDefault(); filterHelpContent(); });
+  document.querySelector("#helpSearchInput")?.addEventListener("input", filterHelpContent);
+  document.querySelectorAll("[data-help-view]").forEach((button) => button.addEventListener("click", (event) => { event.stopPropagation(); openHelpTarget(event.currentTarget.dataset.helpView); }));
+  document.querySelector("#copyHelpTechInfo")?.addEventListener("click", copyHelpTechnicalInfo);
+  document.querySelector("#contactHelpSupport")?.addEventListener("click", contactHelpSupport);
+}
+
+function openHelpTarget(viewId) {
+  activateModuleView(viewId);
+}
+
+function filterHelpContent() {
+  const query = normalize(document.querySelector("#helpSearchInput")?.value || "");
+  let visibleTopics = 0;
+  document.querySelectorAll("[data-help-topic]").forEach((card) => {
+    const visible = !query || normalize(card.dataset.helpSearch).includes(query);
+    card.classList.toggle("hidden", !visible);
+    if (visible) visibleTopics += 1;
+  });
+  document.querySelectorAll("[data-help-faq]").forEach((item) => item.classList.toggle("hidden", !!query && !normalize(item.dataset.helpSearch).includes(query)));
+  document.querySelector("#helpSearchResult") && (document.querySelector("#helpSearchResult").textContent = `${visibleTopics} guia${visibleTopics === 1 ? "" : "s"} disponibles`);
+}
+
+function renderHelpStatus() {
+  const latest = (state.backups.items || [])[0];
+  document.querySelector("#helpLastBackup") && (document.querySelector("#helpLastBackup").textContent = latest ? formatDateTime(latest.fecha) : "Sin registros");
+}
+
+function copyHelpTechnicalInfo() {
+  const latest = (state.backups.items || [])[0];
+  const info = [`PREDICEX 0.1.0`, `Rol: ${state.auth.user?.rol || "Consulta"}`, `Modo: ${state.configuration?.modoDatos || "sqlserver"}`, `Servidor: ${state.configuration?.sqlServer || "-"}`, `Base de datos: ${state.configuration?.sqlDatabase || "-"}`, `Ultimo respaldo: ${latest ? formatDateTime(latest.fecha) : "Sin registros"}`].join("\n");
+  navigator.clipboard?.writeText(info).then(() => setStatus("Informacion tecnica copiada.", "ok")).catch(() => setStatus(info, "ok"));
+}
+
+function contactHelpSupport() {
+  const subject = encodeURIComponent("Soporte PREDICEX");
+  const body = encodeURIComponent("Describe aqui el caso y adjunta la informacion tecnica copiada desde PREDICEX.");
+  window.location.href = `mailto:soporte@predicex.local?subject=${subject}&body=${body}`;
+}
+async function loadHelpStatusData() {
+  try {
+    if (!state.configuration) state.configuration = await apiRequest("/configuracion");
+    if (!state.backups.items.length) {
+      const result = await apiRequest(`/backups?${backupQuery()}`);
+      state.backups.items = result.items || [];
+      state.backups.pagination = result.pagination || state.backups.pagination;
+    }
+    renderHelpStatus();
+  } catch {
+    renderHelpStatus();
+  }
 }
 
 function renderHelpView() {
   ensureHelpView();
+  loadHelpStatusData();
+  filterHelpContent();
 }
 // Professional sidebar navigation
 const modulePermissions = {

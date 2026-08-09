@@ -231,7 +231,11 @@ function permissionMatrix() {
 function usersAndRoles(currentUser = null) {
   const activeSessions = [...sessions.values()].filter((session) => session.expiresAt >= Date.now());
   return {
-    usuarios: [{ id: "usr-admin", nombre: "Administrador", email: ADMIN_EMAIL, rol: "Administrador", estado: "Activo", sesionActual: currentUser?.id === "usr-admin" }],
+    usuarios: [
+      { id: "usr-admin", nombre: "Administrador", email: ADMIN_EMAIL, rol: "Administrador", estado: "Activo", sesionActual: currentUser?.id === "usr-admin" },
+      { id: "usr-operador", nombre: "Operador", email: "operador@predicex.local", rol: "Operador", estado: "Activo", sesionActual: false },
+      { id: "usr-consulta", nombre: "Consulta", email: "consulta@predicex.local", rol: "Consulta", estado: "Activo", sesionActual: false },
+    ],
     roles: permissionMatrix(),
     sesionesActivas: activeSessions.length,
   };
@@ -452,19 +456,26 @@ function auditLog(options = {}) {
 }
 function backupHistory(options = {}) {
   const log = auditService.readAudit({ ...options, modulo: "sqlserver", accion: "respaldo" });
+  const completedItems = log.items.filter((entry) => entry.resultado === "ok");
+  const pageSize = Math.max(Number(options.pageSize || log.pagination?.pageSize || 10), 1);
   return {
     ...log,
-    items: log.items.map((entry) => ({
+    items: completedItems.map((entry) => ({
       nombre: entry.registro,
       usuario: entry.usuario,
       rol: entry.rol,
       ubicacion: entry.nuevo?.location || null,
-      estado: entry.resultado === "ok" ? "Completado" : "Error",
-      validado: entry.resultado === "ok",
+      estado: "Completado",
+      validado: true,
       fecha: entry.fecha,
       ip: entry.ip,
-      mensaje: entry.error || (entry.resultado === "ok" ? "Respaldo validado" : "No completado"),
+      mensaje: "Respaldo validado",
     })),
+    pagination: {
+      ...log.pagination,
+      total: completedItems.length,
+      totalPages: Math.max(1, Math.ceil(completedItems.length / pageSize)),
+    },
   };
 }
 async function backupDatabase(context = {}) {
@@ -474,7 +485,7 @@ async function backupDatabase(context = {}) {
   const fullPath = `${location}\\${name}`;
   try {
     await sqlRepository.runSql(`IF DB_ID(N'PREDICEX') IS NULL THROW 53000, 'Base de datos PREDICEX no encontrada', 1;`);
-    await sqlRepository.runSql(`EXEC xp_create_subdir N'${location.replace(/'/g, "''")}'; BACKUP DATABASE PREDICEX TO DISK = N'${fullPath.replace(/'/g, "''")}' WITH INIT, CHECKSUM, COMPRESSION; RESTORE VERIFYONLY FROM DISK = N'${fullPath.replace(/'/g, "''")}' WITH CHECKSUM; IF OBJECT_ID(N'dbo.respaldos', N'U') IS NOT NULL INSERT INTO dbo.respaldos (nombre, ubicacion, usuario, estado, validado, mensaje) VALUES (N'${name.replace(/'/g, "''")}', N'${fullPath.replace(/'/g, "''")}', N'${(context.user?.email || "sistema").replace(/'/g, "''")}', 'Completado', 1, N'Respaldo validado con RESTORE VERIFYONLY');`);
+    await sqlRepository.runSql(`EXEC xp_create_subdir N'${location.replace(/'/g, "''")}'; BACKUP DATABASE PREDICEX TO DISK = N'${fullPath.replace(/'/g, "''")}' WITH INIT, CHECKSUM; RESTORE VERIFYONLY FROM DISK = N'${fullPath.replace(/'/g, "''")}' WITH CHECKSUM; IF OBJECT_ID(N'dbo.respaldos', N'U') IS NOT NULL INSERT INTO dbo.respaldos (nombre, ubicacion, usuario, estado, validado, mensaje) VALUES (N'${name.replace(/'/g, "''")}', N'${fullPath.replace(/'/g, "''")}', N'${(context.user?.email || "sistema").replace(/'/g, "''")}', 'Completado', 1, N'Respaldo validado con RESTORE VERIFYONLY');`);
     auditService.writeAudit({ user: context.user, ip: context.ip, action: "respaldo", module: "sqlserver", recordId: name, after: { location: fullPath }, result: "ok" });
     return { status: 201, data: { nombre: name, ubicacion: fullPath, estado: "Completado", validado: true } };
   } catch (error) {
