@@ -1170,6 +1170,7 @@ logoutButton.addEventListener("click", (event) => {
   sessionStorage.removeItem("predicexUser");
   state.auth.token = "";
   state.auth.user = null;
+  showLogin();
 }, true);
 
 document.addEventListener("click", async (event) => {
