@@ -1464,7 +1464,7 @@ function renderPurchaseOrdersView() {
   const body = document.querySelector("#purchaseOrdersTableBody");
   if (!body) return;
   body.innerHTML = orders.length
-    ? orders.map((item) => `<tr><td>${item.id}</td><td>${item.sku}</td><td>${item.producto}</td><td>${item.sucursal}</td><td>${item.proveedor}</td><td>${Number(item.cantidad || 0).toLocaleString("es-DO")}</td><td>${formatMoney(item.costo)}</td><td><span class="tag ${item.prioridad === "Alta" ? "empty" : "low"}">${item.prioridad}</span></td><td><span class="tag ${item.estado === "Critica" ? "empty" : "low"}">${item.estado}</span></td><td class="table-actions"><button type="button" data-action="mark-purchase-order" data-id="${item.id}">Marcar revisada</button></td></tr>`).join("")
+    ? orders.map((item) => `<tr><td>${item.id}</td><td>${item.sku}</td><td>${item.producto}</td><td>${item.sucursal}</td><td>${item.proveedor}</td><td>${Number(item.cantidad || 0).toLocaleString("es-DO")}</td><td>${formatMoney(item.costo)}</td><td><span class="tag ${item.prioridad === "Alta" ? "empty" : "low"}">${item.prioridad}</span></td><td><span class="tag ${item.estado === "Critica" ? "empty" : "low"}">${item.estado}</span></td><td class="table-actions"><button type="button" data-action="mark-purchase-order" data-id="${item.id}">Revisar orden</button></td></tr>`).join("")
     : `<tr><td colspan="10" class="empty-table-cell">No hay productos bajo minimo para ordenar.</td></tr>`;
 }
 
@@ -2408,7 +2408,6 @@ function ensureHelpView() {
                 <span>Version del sistema<strong id="helpSupportVersion">0.1.0</strong></span>
               </div>
               <div class="support-actions">
-                <button id="copyHelpTechInfo" type="button" class="help-secondary-button">Copiar informacion tecnica</button>
                 <button id="contactHelpSupport" type="button" class="help-primary-button">Contactar soporte</button>
               </div>
             </article>
@@ -2419,7 +2418,6 @@ function ensureHelpView() {
   document.querySelector("#helpSearchForm")?.addEventListener("submit", (event) => { event.preventDefault(); filterHelpContent(); });
   document.querySelector("#helpSearchInput")?.addEventListener("input", filterHelpContent);
   document.querySelectorAll("[data-help-view]").forEach((button) => button.addEventListener("click", (event) => { event.stopPropagation(); openHelpTarget(event.currentTarget.dataset.helpView); }));
-  document.querySelector("#copyHelpTechInfo")?.addEventListener("click", copyHelpTechnicalInfo);
   document.querySelector("#contactHelpSupport")?.addEventListener("click", contactHelpSupport);
 }
 
@@ -2444,16 +2442,11 @@ function renderHelpStatus() {
   document.querySelector("#helpLastBackup") && (document.querySelector("#helpLastBackup").textContent = latest ? formatDateTime(latest.fecha) : "Sin registros");
 }
 
-function copyHelpTechnicalInfo() {
-  const latest = (state.backups.items || [])[0];
-  const info = [`PREDICEX 0.1.0`, `Rol: ${state.auth.user?.rol || "Consulta"}`, `Modo: ${state.configuration?.modoDatos || "sqlserver"}`, `Servidor: ${state.configuration?.sqlServer || "-"}`, `Base de datos: ${state.configuration?.sqlDatabase || "-"}`, `Ultimo respaldo: ${latest ? formatDateTime(latest.fecha) : "Sin registros"}`].join("\n");
-  navigator.clipboard?.writeText(info).then(() => setStatus("Informacion tecnica copiada.", "ok")).catch(() => setStatus(info, "ok"));
-}
 
 function contactHelpSupport() {
   const subject = encodeURIComponent("Soporte PREDICEX");
-  const body = encodeURIComponent("Describe aqui el caso y adjunta la informacion tecnica copiada desde PREDICEX.");
-  window.location.href = `mailto:soporte@predicex.local?subject=${subject}&body=${body}`;
+  const body = encodeURIComponent("Describe aqui el caso para que soporte pueda ayudarte.");
+  window.location.href = `https://mail.google.com/mail/?view=cm&fs=1&to=soporte@predicex.local&su=${subject}&body=${body}`;
 }
 async function loadHelpStatusData() {
   try {

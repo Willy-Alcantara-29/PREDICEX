@@ -4594,3 +4594,45 @@ select:focus,
 #loansView .table-actions button[data-action="toggle-loan-status"][data-next-status="Anulado"]::before {
   mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 8v5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
 }
+
+/* Accion destacada en ordenes de compra */
+#purchaseOrdersView .table-actions {
+  justify-content: center;
+}
+
+#purchaseOrdersView .table-actions button[data-action="mark-purchase-order"] {
+  min-width: 138px;
+  border-color: rgba(6, 182, 212, 0.42);
+  color: #cffafe;
+  background: linear-gradient(135deg, #0f766e 0%, #0891b2 48%, #2563eb 100%);
+  box-shadow: 0 12px 24px rgba(8, 145, 178, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+#purchaseOrdersView .table-actions button[data-action="mark-purchase-order"]::before {
+  width: 16px;
+  height: 16px;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9 11l3 3L22 4' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+#purchaseOrdersView .table-actions button[data-action="mark-purchase-order"]:hover,
+#purchaseOrdersView .table-actions button[data-action="mark-purchase-order"]:focus-visible {
+  border-color: rgba(103, 232, 249, 0.72);
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d9488 0%, #06b6d4 48%, #1d4ed8 100%);
+  box-shadow: 0 16px 30px rgba(6, 182, 212, 0.3), 0 0 0 3px rgba(103, 232, 249, 0.16);
+  outline: none;
+}
+
+#purchaseOrdersView th:last-child,
+#purchaseOrdersView td:last-child {
+  text-align: center;
+}
+
+#purchaseOrdersView td.table-actions {
+  display: table-cell;
+  text-align: center;
+}
+
+#purchaseOrdersView td.table-actions button[data-action="mark-purchase-order"] {
+  margin-inline: auto;
+}
