@@ -2684,6 +2684,7 @@ const previousShowAppForSidebar = showApp;
 showApp = function() {
   previousShowAppForSidebar();
   initializeProfessionalSidebar();
+  activateModuleView("dashboardView");
 };
 
 
