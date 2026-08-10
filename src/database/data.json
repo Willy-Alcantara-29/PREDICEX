@@ -1,0 +1,304 @@
+{
+  "proveedores": [
+    {
+      "id": "prov-001",
+      "razonSocial": "Distribuidora Caribe SRL",
+      "rnc": "131245678",
+      "telefono": "809-555-0142",
+      "correo": "compras@caribe.example",
+      "estado": "Activo"
+    },
+    {
+      "id": "prov-002",
+      "razonSocial": "Suplidores del Norte",
+      "rnc": "101334455",
+      "telefono": "809-555-0188",
+      "correo": "ventas@norte.example",
+      "estado": "Activo"
+    },
+    {
+      "id": "prov-003",
+      "razonSocial": "Importadora Duarte",
+      "rnc": "130778899",
+      "telefono": "809-555-0120",
+      "correo": "ordenes@duarte.example",
+      "estado": "Inactivo"
+    },
+    {
+      "id": "prov-004",
+      "razonSocial": "Proveedor Demo Actualizado SRL",
+      "rnc": "132555777",
+      "telefono": "809-555-0200",
+      "estado": "Inactivo"
+    }
+  ],
+  "productos": [
+    {
+      "id": "prd-001",
+      "sku": "SKU-PRD-018",
+      "codigoBarra": "746000000018",
+      "descripcion": "Arroz premium 25 lb",
+      "categoria": "Alimentos",
+      "precio": 185,
+      "estado": "Activo"
+    },
+    {
+      "id": "prd-002",
+      "sku": "SKU-PRD-104",
+      "codigoBarra": "746000000104",
+      "descripcion": "Aceite vegetal 1 gal",
+      "categoria": "Alimentos",
+      "precio": 325,
+      "estado": "Activo"
+    },
+    {
+      "id": "prd-003",
+      "sku": "SKU-PRD-210",
+      "codigoBarra": "746000000210",
+      "descripcion": "Detergente industrial 5 kg",
+      "categoria": "Limpieza",
+      "precio": 480,
+      "estado": "Activo"
+    },
+    {
+      "id": "prd-004",
+      "sku": "SKU-PRD-999",
+      "codigoBarra": "746000000999",
+      "descripcion": "Producto de prueba",
+      "categoria": "Demo",
+      "precio": 10,
+      "estado": "Activo"
+    }
+  ],
+  "inventarios": [
+    {
+      "id": "inv-001",
+      "productoId": "prd-001",
+      "sku": "SKU-PRD-018",
+      "producto": "Arroz premium 25 lb",
+      "sucursal": "Sucursal Norte",
+      "stockNeto": 8,
+      "umbralAlerta": 20,
+      "precioUnitario": 185
+    },
+    {
+      "id": "inv-002",
+      "productoId": "prd-002",
+      "sku": "SKU-PRD-104",
+      "producto": "Aceite vegetal 1 gal",
+      "sucursal": "Almacen Central",
+      "stockNeto": 240,
+      "umbralAlerta": 60,
+      "precioUnitario": 325
+    },
+    {
+      "id": "inv-003",
+      "productoId": "prd-003",
+      "sku": "SKU-PRD-210",
+      "producto": "Detergente industrial 5 kg",
+      "sucursal": "Sucursal Este",
+      "stockNeto": 34,
+      "umbralAlerta": 30,
+      "precioUnitario": 480
+    },
+    {
+      "id": "inv-004",
+      "productoId": "prd-004",
+      "sku": "SKU-PRD-999",
+      "producto": "Producto de prueba",
+      "sucursal": "Sucursal Demo",
+      "stockNeto": 15,
+      "umbralAlerta": 10,
+      "precioUnitario": 10
+    }
+  ],
+  "movimientos": [
+    {
+      "id": "mov-004",
+      "tipo": "Salida",
+      "sku": "SKU-PRD-999",
+      "producto": "Producto de prueba",
+      "sucursalOrigen": "Sucursal Demo",
+      "sucursalDestino": "Cliente",
+      "cantidad": 5,
+      "nota": "Prueba",
+      "creadoEn": "2026-07-25T04:07:09.784Z"
+    },
+    {
+      "id": "mov-001",
+      "tipo": "Entrada",
+      "sku": "SKU-PRD-104",
+      "producto": "Aceite vegetal 1 gal",
+      "sucursalOrigen": "Proveedor",
+      "sucursalDestino": "Almacen Central",
+      "cantidad": 120,
+      "nota": "Recepcion de compra",
+      "creadoEn": "2026-07-03T12:00:00.000Z"
+    },
+    {
+      "id": "mov-002",
+      "tipo": "Salida",
+      "sku": "SKU-PRD-018",
+      "producto": "Arroz premium 25 lb",
+      "sucursalOrigen": "Sucursal Norte",
+      "sucursalDestino": "Cliente",
+      "cantidad": 12,
+      "nota": "Despacho operativo",
+      "creadoEn": "2026-07-03T12:00:00.000Z"
+    },
+    {
+      "id": "mov-003",
+      "tipo": "Transferencia",
+      "sku": "SKU-PRD-210",
+      "producto": "Detergente industrial 5 kg",
+      "sucursalOrigen": "Almacen Central",
+      "sucursalDestino": "Sucursal Este",
+      "cantidad": 18,
+      "nota": "Balance multisucursal",
+      "creadoEn": "2026-07-03T12:00:00.000Z"
+    }
+  ],
+  "clientes": [
+    {
+      "id": "cli-001",
+      "nombre": "Maria Gonzalez",
+      "documento": "001-1234567-8",
+      "telefono": "809-555-1100",
+      "correo": "maria.gonzalez@example.com",
+      "direccion": "Santo Domingo Norte",
+      "estado": "Activo"
+    },
+    {
+      "id": "cli-002",
+      "nombre": "Carlos Ramirez",
+      "documento": "001-9876543-2",
+      "telefono": "809-555-2200",
+      "correo": "carlos.ramirez@example.com",
+      "direccion": "Santiago",
+      "estado": "Activo"
+    },
+    {
+      "id": "cli-003",
+      "nombre": "Ana Perez",
+      "documento": "402-1122334-5",
+      "telefono": "809-555-3300",
+      "correo": "ana.perez@example.com",
+      "direccion": "La Vega",
+      "estado": "Inactivo"
+    },
+    {
+      "id": "cli-004",
+      "nombre": "Cliente Demo Prueba",
+      "documento": "001-5555555-5",
+      "telefono": "809-555-5555",
+      "correo": "cliente.demo@example.com",
+      "estado": "Activo"
+    }
+  ],
+  "prestamos": [
+    {
+      "id": "pre-001",
+      "clienteId": "cli-001",
+      "cliente": "Maria Gonzalez",
+      "monto": 85000,
+      "tasa": 14,
+      "plazoMeses": 12,
+      "balancePendiente": 64200,
+      "estado": "Activo",
+      "fecha": "2026-06-10"
+    },
+    {
+      "id": "pre-002",
+      "clienteId": "cli-002",
+      "cliente": "Carlos Ramirez",
+      "monto": 120000,
+      "tasa": 12,
+      "plazoMeses": 18,
+      "balancePendiente": 98000,
+      "estado": "Activo",
+      "fecha": "2026-06-18"
+    },
+    {
+      "id": "pre-003",
+      "clienteId": "cli-003",
+      "cliente": "Ana Perez",
+      "monto": 45000,
+      "tasa": 10,
+      "plazoMeses": 6,
+      "balancePendiente": 0,
+      "estado": "Cerrado",
+      "fecha": "2026-05-20"
+    },
+    {
+      "id": "pre-004",
+      "clienteId": "cli-004",
+      "monto": 25000,
+      "tasa": 12,
+      "plazoMeses": 10,
+      "balancePendiente": 22500,
+      "estado": "Activo",
+      "cliente": "Cliente Demo Prueba",
+      "fecha": "2026-07-25"
+    }
+  ],
+  "pagos": [
+    {
+      "id": "pag-001",
+      "prestamoId": "pre-001",
+      "cliente": "Maria Gonzalez",
+      "monto": 7200,
+      "metodo": "Transferencia",
+      "referencia": "TRX-10021",
+      "fecha": "2026-07-01",
+      "estado": "Aplicado"
+    },
+    {
+      "id": "pag-002",
+      "prestamoId": "pre-002",
+      "cliente": "Carlos Ramirez",
+      "monto": 9500,
+      "metodo": "Efectivo",
+      "referencia": "CAJA-221",
+      "fecha": "2026-07-02",
+      "estado": "Aplicado"
+    },
+    {
+      "id": "pag-003",
+      "prestamoId": "pre-001",
+      "cliente": "Maria Gonzalez",
+      "monto": 6800,
+      "metodo": "Tarjeta",
+      "referencia": "POS-4419",
+      "fecha": "2026-07-03",
+      "estado": "Pendiente"
+    },
+    {
+      "id": "pag-004",
+      "prestamoId": "pre-004",
+      "monto": 2500,
+      "metodo": "Efectivo",
+      "referencia": "TEST-001",
+      "estado": "Aplicado",
+      "cliente": "Cliente Demo Prueba",
+      "fecha": "2026-07-25"
+    }
+  ],
+  "sucursales": [
+    {
+      "id": "suc-001",
+      "nombre": "Sucursal Norte"
+    },
+    {
+      "id": "suc-002",
+      "nombre": "Almacen Central"
+    },
+    {
+      "id": "suc-003",
+      "nombre": "Sucursal Este"
+    },
+    {
+      "id": "suc-004",
+      "nombre": "Sucursal Demo QA Actualizada"
+    }
+  ]
+}
